@@ -10,6 +10,13 @@ pub enum Token {
     // Operators
     ASSIGN,
     PLUS,
+    MINUS,
+    BANG,
+    ASTERISK,
+    SLASH,
+
+    LT,
+    GT,
 
     // Delimiters
     COMMA,
@@ -23,6 +30,7 @@ pub enum Token {
     // Keywords
     FUNCTION,
     LET,
+
 }
 
 impl Token {

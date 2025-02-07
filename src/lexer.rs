@@ -1,7 +1,6 @@
 use crate::token::Token;
 use std::iter::Peekable;
 use std::ops::Add;
-use std::process::id;
 use std::str::Chars;
 #[derive(Debug)]
 struct Lexer<'a> {
@@ -51,6 +50,12 @@ impl<'a> Lexer<'a> {
                 '+' => Token::PLUS,
                 '{' => Token::LBRACE,
                 '}' => Token::RBRACE,
+                '!' => Token::BANG,
+                '-' => Token::MINUS,
+                '/' => Token::SLASH,
+                '*' => Token::ASTERISK,
+                '<' => Token::LT,
+                '>' => Token::GT,
                 _ => {
                     if is_letter(&token) {
                         let ident = self.read_identifier();
@@ -86,7 +91,10 @@ mod tests {
             let add = fn(x, y) {
                 x + y;
             };
-            let result = add(five, ten);";
+            let result = add(five, ten);
+            !-/*5;
+            5 < 10 > 5;
+            ";
         let mut lexer = Lexer::new(input);
         let expected = vec![
             Token::LET,
@@ -124,10 +132,24 @@ mod tests {
             Token::COMMA,
             Token::IDENT(String::from("ten")),
             Token::RPAREN,
+            Token::SEMICOLON,
+            Token::BANG,
+            Token::MINUS,
+            Token::SLASH,
+            Token::ASTERISK,
+            INT(5),
+            Token::SEMICOLON,
+            INT(5),
+            Token::LT,
+            INT(10),
+            Token::GT,
+            INT(5),
             Token::SEMICOLON
         ];
+
         for i in 0..expected.len() {
             let actual = lexer.next_token();
+            println!("Current : {:?} actual: {:?}", expected[i], actual);
             assert_eq!(expected[i], actual);
         }
     }

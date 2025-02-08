@@ -1,44 +1,55 @@
 #[derive(Debug, Eq, PartialEq)]
 pub enum Token {
-    ILLEGAL,
-    EOF,
+    Illegal,
+    Eof,
 
     // Identifiers + literals
-    IDENT(String),
-    INT(i64),
+    Ident(String),
+    Int(i64),
 
     // Operators
-    ASSIGN,
-    PLUS,
-    MINUS,
-    BANG,
-    ASTERISK,
-    SLASH,
+    Assign,
+    Plus,
+    Minus,
+    Bang,
+    Asterisk,
+    Slash,
+    Eq,
+    NotEq,
 
-    LT,
-    GT,
+    Lt,
+    Gt,
 
     // Delimiters
-    COMMA,
-    SEMICOLON,
+    Comma,
+    Semicolon,
 
-    LPAREN,
-    RPAREN,
-    LBRACE,
-    RBRACE,
+    LParen,
+    RParen,
+    LBrace,
+    RBrace,
 
     // Keywords
-    FUNCTION,
-    LET,
-
+    Function,
+    Let,
+    True,
+    False,
+    If,
+    Else,
+    Return,
 }
 
 impl Token {
     pub fn lookup_ident(ident: String) -> Token {
         match ident.as_str() {
-            "fn" => Token::FUNCTION,
-            "let" => Token::LET,
-            _ => Token::IDENT(ident.to_string())
+            "fn" => Token::Function,
+            "let" => Token::Let,
+            "true" => Token::True,
+            "false" => Token::False,
+            "if" => Token::If,
+            "else" => Token::Else,
+            "return" => Token::Return,
+            _ => Token::Ident(ident.to_string())
         }
     }
 }

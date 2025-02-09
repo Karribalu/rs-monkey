@@ -2,12 +2,12 @@ use crate::token::Token;
 use std::iter::Peekable;
 use std::str::Chars;
 #[derive(Debug)]
-struct Lexer<'a> {
-    input: Peekable<Chars<'a>>,
+pub struct Lexer<'a> {
+    pub input: Peekable<Chars<'a>>,
 }
 
 impl<'a> Lexer<'a> {
-    fn new(input: &'a str) -> Self {
+    pub fn new(input: &'a str) -> Self {
         Self {
             input: input.chars().peekable(),
         }
@@ -36,7 +36,7 @@ impl<'a> Lexer<'a> {
             self.read_char();
         }
     }
-    fn next_token(&mut self) -> Token {
+    pub fn next_token(&mut self) -> Token {
         self.eat_white_space();
         let token = self.input.peek();
         if let Some(token) = token {
@@ -190,7 +190,6 @@ mod tests {
             Token::False,
             Token::Semicolon,
             Token::RBrace,
-
             Token::Int(10),
             Token::Eq,
             Token::Int(10),

@@ -16,7 +16,8 @@ impl Program {
 }
 #[derive(Debug, Eq, PartialEq)]
 pub enum Statement {
-    Let(LetStatement)
+    Let(LetStatement),
+    Return(ReturnStatement),
 }
 #[derive(Debug, Eq, PartialEq)]
 pub enum Expression {
@@ -30,4 +31,9 @@ pub struct LetStatement {
 #[derive(Debug, Eq, PartialEq)]
 pub struct Identifier {
     pub(crate) value: String,
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub struct ReturnStatement {
+    pub(crate) value: Expression,
 }

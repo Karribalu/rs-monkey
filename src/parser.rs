@@ -1,9 +1,10 @@
+use std::cmp::PartialEq;
 use thiserror::Error;
-use crate::ast::{Expression, Identifier, LetStatement, Program, Statement};
+use crate::ast::{Expression, Identifier, LetStatement, Program, ReturnStatement, Statement};
 use crate::lexer::Lexer;
 use crate::token::Token;
 type ParseResult<T> = Result<T, ParseError>;
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Eq, PartialEq)]
 pub enum ParseError {
     #[error("Error while parsing the let statement: {0}")]
     LetSyntaxError(String),
@@ -16,6 +17,7 @@ pub struct Parser<'a> {
     pub curr_token: Token,
     pub peek_token: Token,
 }
+
 impl<'a> Parser<'a> {
     pub fn new(lexer: Lexer<'a>) -> Self {
         let mut l = lexer;
@@ -33,7 +35,6 @@ impl<'a> Parser<'a> {
     }
 
     pub fn parse_program(&mut self) -> ParseResult<Program> {
-        print!("Called");
         let mut program = Program::new();
         while self.curr_token != Token::Eof {
             let stmt = self.parse_statement()?;
@@ -72,17 +73,17 @@ impl<'a> Parser<'a> {
             Token::False => {}
             Token::If => {}
             Token::Else => {}
-            Token::Return => {}
+            Token::Return => {
+                return self.parse_return_statement();
+            }
         }
         Err(ParseError::ParsingFailed)
     }
     pub fn parse_let_statement(&mut self) -> ParseResult<Statement> {
-        let mut stmt = LetStatement {
-            name: Identifier { value: "".to_string() },
-            value: Expression::Something,
-        };
+        let name;
+        let value;
         let identifier = self.expect_ident()?;
-        stmt.name = Identifier {
+        name = Identifier {
             value: identifier
         };
         self.next_token();
@@ -90,7 +91,21 @@ impl<'a> Parser<'a> {
         while !self.is_curr_token(Token::Semicolon) {
             self.next_token();
         }
-        Ok(Statement::Let(stmt))
+        value = Expression::Something;
+        Ok(Statement::Let(LetStatement {
+            name,
+            value,
+        }))
+    }
+    pub fn parse_return_statement(&mut self) -> ParseResult<Statement> {
+        let expression = Expression::Something;
+        self.next_token();
+        while &self.curr_token != &Token::Semicolon {
+            self.next_token();
+        }
+        Ok(Statement::Return(ReturnStatement {
+            value: expression
+        }))
     }
     fn is_curr_token(&self, token: Token) -> bool {
         self.curr_token == token
@@ -111,7 +126,7 @@ impl<'a> Parser<'a> {
                 Ok(name.clone())
             }
             _ => {
-                Err(ParseError::LetSyntaxError("Identifier not found for let statement".to_string()))
+                Err(ParseError::LetSyntaxError(format!("Expected next token to be identifier but found {:?}", &self.peek_token)))
             }
         }
     }
@@ -119,12 +134,14 @@ impl<'a> Parser<'a> {
 
 
 mod tests {
-    use crate::ast::{Expression, Identifier, LetStatement, Statement};
+    use std::process::id;
+    use crate::ast::{Expression, Identifier, LetStatement, ReturnStatement, Statement};
     use crate::lexer::Lexer;
-    use crate::parser::Parser;
+    use crate::parser::{ParseError, Parser};
+    use crate::token::Token;
 
     #[test]
-    fn basic_test() {
+    fn test_let_parser() {
         let input = "let x = 5;
             let y = 10;
             let foobar = 838383;";
@@ -155,6 +172,44 @@ mod tests {
             }),
         ];
         for (idx, expected_statement) in expected.iter().enumerate() {
+            let actual_statement = &statements[idx];
+            assert_eq!(expected_statement, actual_statement)
+        }
+    }
+    #[test]
+    fn test_let_parser_error() {
+        let input = "let x = 5;
+            let = 10;
+            let foobar = 838383;";
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        assert!(program.is_err());
+        assert_eq!(program, Err(ParseError::LetSyntaxError(format!("Expected next token to be identifier but found {:?}", Token::Assign))));
+    }
+    #[test]
+    fn test_return_parser() {
+        let input = "return 10;
+            return 20;
+            return 3000;";
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        assert!(program.is_ok());
+        let statements = program.unwrap().statements;
+        let expected = vec![
+            Statement::Return(ReturnStatement {
+                value: Expression::Something,
+            }),
+            Statement::Return(ReturnStatement {
+                value: Expression::Something,
+            }),
+            Statement::Return(ReturnStatement {
+                value: Expression::Something,
+            }),
+        ];
+        for (idx, expected_statement) in expected.iter().enumerate() {
+            print!("{:?}", &statements[idx]);
             let actual_statement = &statements[idx];
             assert_eq!(expected_statement, actual_statement)
         }

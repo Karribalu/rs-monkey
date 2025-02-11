@@ -1,10 +1,10 @@
-use std::cmp::PartialEq;
-use thiserror::Error;
 use crate::ast::{Expression, Identifier, LetStatement, Program, ReturnStatement, Statement};
 use crate::lexer::Lexer;
 use crate::token::Token;
+use std::cmp::PartialEq;
+use thiserror::Error;
 type ParseResult<T> = Result<T, ParseError>;
-#[derive(Error, Debug, Eq, PartialEq)]
+#[derive(Error, Clone, Debug, Eq, PartialEq)]
 pub enum ParseError {
     #[error("Error while parsing the let statement: {0}")]
     LetSyntaxError(String),
@@ -134,7 +134,6 @@ impl<'a> Parser<'a> {
 
 
 mod tests {
-    use std::process::id;
     use crate::ast::{Expression, Identifier, LetStatement, ReturnStatement, Statement};
     use crate::lexer::Lexer;
     use crate::parser::{ParseError, Parser};
@@ -209,7 +208,6 @@ mod tests {
             }),
         ];
         for (idx, expected_statement) in expected.iter().enumerate() {
-            print!("{:?}", &statements[idx]);
             let actual_statement = &statements[idx];
             assert_eq!(expected_statement, actual_statement)
         }

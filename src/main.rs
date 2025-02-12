@@ -6,6 +6,7 @@ mod token;
 mod repl;
 mod ast;
 mod parser;
+mod constants;
 
 fn main() {
     let input = io::stdin().lock();

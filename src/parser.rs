@@ -1,4 +1,4 @@
-use crate::ast::{Expression, Identifier, LetStatement, Program, ReturnStatement, Statement};
+use crate::ast::{Expression, ExpressionStatement, Identifier, LetStatement, Program, ReturnStatement, Statement};
 use crate::lexer::Lexer;
 use crate::token::Token;
 use std::cmp::PartialEq;
@@ -45,36 +45,14 @@ impl<'a> Parser<'a> {
     }
     pub fn parse_statement(&mut self) -> ParseResult<Statement> {
         match self.curr_token {
-            Token::Illegal => {}
-            Token::Eof => {}
-            Token::Ident(_) => {}
-            Token::Int(_) => {}
-            Token::Assign => {}
-            Token::Plus => {}
-            Token::Minus => {}
-            Token::Bang => {}
-            Token::Asterisk => {}
-            Token::Slash => {}
-            Token::Eq => {}
-            Token::NotEq => {}
-            Token::Lt => {}
-            Token::Gt => {}
-            Token::Comma => {}
-            Token::Semicolon => {}
-            Token::LParen => {}
-            Token::RParen => {}
-            Token::LBrace => {}
-            Token::RBrace => {}
-            Token::Function => {}
             Token::Let => {
                 return self.parse_let_statement();
             }
-            Token::True => {}
-            Token::False => {}
-            Token::If => {}
-            Token::Else => {}
             Token::Return => {
                 return self.parse_return_statement();
+            }
+            _ => {
+
             }
         }
         Err(ParseError::ParsingFailed)
@@ -106,6 +84,12 @@ impl<'a> Parser<'a> {
         Ok(Statement::Return(ReturnStatement {
             value: expression
         }))
+    }
+    pub fn parse_expression_statement(&self) -> ExpressionStatement {
+        // let stmt = ExpressionStatement {
+        //     val
+        // }
+
     }
     fn is_curr_token(&self, token: Token) -> bool {
         self.curr_token == token

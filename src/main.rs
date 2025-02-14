@@ -1,4 +1,5 @@
 #![feature(let_chains)]
+#![feature(unboxed_closures)]
 
 use std::io;
 mod lexer;

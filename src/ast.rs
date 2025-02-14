@@ -81,11 +81,11 @@ impl Display for ReturnStatement {
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct ExpressionStatement {
-    pub(crate) value: Expression,
+    pub(crate) expression: Expression,
 }
 
 impl Display for ExpressionStatement {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.value)
+        write!(f, "{}", self.expression)
     }
 }

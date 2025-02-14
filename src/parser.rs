@@ -1,8 +1,11 @@
 use crate::ast::{Expression, ExpressionStatement, Identifier, LetStatement, Program, ReturnStatement, Statement};
 use crate::lexer::Lexer;
+use crate::parser::Precedence::*;
 use crate::token::Token;
 use std::cmp::PartialEq;
+use std::collections::HashMap;
 use thiserror::Error;
+
 type ParseResult<T> = Result<T, ParseError>;
 #[derive(Error, Clone, Debug, Eq, PartialEq)]
 pub enum ParseError {
@@ -16,6 +19,30 @@ pub struct Parser<'a> {
     pub lexer: Lexer<'a>,
     pub curr_token: Token,
     pub peek_token: Token,
+    pub prefix_parse_fns: HashMap<Token, dyn Fn<()>>,
+    pub suffix_parse_fns: HashMap<Token, dyn Fn<Expression>>,
+}
+enum Precedence {
+    Lowest,
+    Equals,
+    LessGreater, // > or <
+    Sum, // +
+    Product, // *
+    Prefix, // -X or !X
+    Call,
+}
+impl Precedence {
+    fn value(&self) -> u8 {
+        match &self {
+            Precedence::Lowest => { 1 }
+            Precedence::Equals => { 2 }
+            Precedence::LessGreater => { 3 }
+            Precedence::Sum => { 4 }
+            Precedence::Product => { 5 }
+            Precedence::Prefix => { 6 }
+            Precedence::Call => { 7 }
+        }
+    }
 }
 
 impl<'a> Parser<'a> {
@@ -27,6 +54,8 @@ impl<'a> Parser<'a> {
             lexer: l,
             curr_token: curr,
             peek_token: next,
+            prefix_parse_fns: HashMap::new(),
+            suffix_parse_fns: HashMap::new(),
         }
     }
     pub fn next_token(&mut self) {
@@ -51,9 +80,7 @@ impl<'a> Parser<'a> {
             Token::Return => {
                 return self.parse_return_statement();
             }
-            _ => {
-
-            }
+            _ => {}
         }
         Err(ParseError::ParsingFailed)
     }
@@ -85,11 +112,17 @@ impl<'a> Parser<'a> {
             value: expression
         }))
     }
-    pub fn parse_expression_statement(&self) -> ExpressionStatement {
-        // let stmt = ExpressionStatement {
-        //     val
-        // }
-        // No time for additional changes
+    pub fn parse_expression_statement(&mut self) -> ParseResult<ExpressionStatement> {
+        let exp = ExpressionStatement {
+            expression: self.parse_expression(Precedence::Lowest)?;
+        };
+        if self.peek_token == Token::Semicolon {
+            self.next_token();
+        }
+        exp
+    }
+    pub fn parse_expression(precedence: Precedence) -> ParseResult<Expression> {
+        return Ok(Expression::Something);
     }
     fn is_curr_token(&self, token: Token) -> bool {
         self.curr_token == token

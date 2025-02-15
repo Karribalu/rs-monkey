@@ -27,6 +27,7 @@ impl Program {
 pub enum Statement {
     Let(LetStatement),
     Return(ReturnStatement),
+    Expression(ExpressionStatement),
 }
 
 impl Display for Statement {
@@ -38,11 +39,16 @@ impl Display for Statement {
             Statement::Return(return_statement) => {
                 write!(f, "return {};", return_statement)
             }
+            Statement::Expression(ex) => {
+                write!(f, "{};", ex)
+            }
         }
     }
 }
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Expression {
+    Identifier(String),
+    Integer(i64),
     Something
 }
 impl Display for Expression {
@@ -52,7 +58,7 @@ impl Display for Expression {
 }
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct LetStatement {
-    pub(crate) name: Identifier,
+    pub(crate) name: String,
     pub(crate) value: Expression,
 }
 impl Display for LetStatement {
@@ -60,15 +66,15 @@ impl Display for LetStatement {
         write!(f, "{} = {}", self.name, self.value)
     }
 }
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct Identifier {
-    pub(crate) value: String,
-}
-impl Display for Identifier {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.value)
-    }
-}
+// #[derive(Debug, Clone, Eq, PartialEq)]
+// pub struct Identifier {
+//     pub(crate) value: String,
+// }
+// impl Display for Identifier {
+//     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+//         write!(f, "{}", self.value)
+//     }
+// }
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ReturnStatement {
     pub(crate) value: Expression,
@@ -79,7 +85,7 @@ impl Display for ReturnStatement {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct ExpressionStatement {
     pub(crate) expression: Expression,
 }

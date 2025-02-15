@@ -197,7 +197,7 @@ mod tests {
             Token::Int(10),
             Token::NotEq,
             Token::Int(9),
-            Token::Semicolon
+            Token::Semicolon,
         ];
         for i in 0..expected.len() {
             let actual = lexer.next_token();

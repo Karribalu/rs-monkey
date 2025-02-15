@@ -1,5 +1,7 @@
 use crate::ast::Statement::Let;
 use std::fmt::{Display, Formatter};
+use crate::token::Token;
+
 // enum Node {
 //     Program(),
 //     Statement
@@ -18,9 +20,7 @@ impl Display for Program {
 }
 impl Program {
     pub(crate) fn new() -> Self {
-        Self {
-            statements: vec![]
-        }
+        Self { statements: vec![] }
     }
 }
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -49,7 +49,8 @@ impl Display for Statement {
 pub enum Expression {
     Identifier(String),
     Integer(i64),
-    Something
+    Prefix(Box<PrefixExpression>),
+    Something,
 }
 impl Display for Expression {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
@@ -93,5 +94,15 @@ pub struct ExpressionStatement {
 impl Display for ExpressionStatement {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.expression)
+    }
+}
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct PrefixExpression {
+    pub(crate) operator: String,
+    pub(crate) right: Box<Expression>,
+}
+impl Display for PrefixExpression {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}{}", self.operator, self.right)
     }
 }

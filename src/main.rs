@@ -2,12 +2,12 @@
 #![feature(unboxed_closures)]
 
 use std::io;
-mod lexer;
-mod token;
-mod repl;
 mod ast;
-mod parser;
 mod constants;
+mod lexer;
+mod parser;
+mod repl;
+mod token;
 
 fn main() {
     let input = io::stdin().lock();

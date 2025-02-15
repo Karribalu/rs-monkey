@@ -51,40 +51,40 @@ impl Token {
             "if" => Token::If,
             "else" => Token::Else,
             "return" => Token::Return,
-            _ => Token::Ident(ident.to_string())
+            _ => Token::Ident(ident.to_string()),
         }
     }
 }
 impl Display for Token {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let string = match self {
-            Token::Illegal => { "Illegal" }
-            Token::Eof => { "Eof" }
-            Token::Ident(ident) => { &*format!("ident: {}", ident) }
-            Token::Int(value) => { &*format!("int: {}", value) }
-            Token::Assign => { "assign" }
-            Token::Plus => { "plus" }
-            Token::Minus => { "minus" }
-            Token::Bang => { "bang!" }
-            Token::Asterisk => { "Asterisk *" }
-            Token::Slash => { "Slash /" }
-            Token::Eq => { "Equal" }
-            Token::NotEq => { "Not Equal" }
-            Token::Lt => { "Less than" }
-            Token::Gt => { "Greater Than" }
-            Token::Comma => { "Comma" }
-            Token::Semicolon => { "Semicolon" }
-            Token::LParen => { "LParen (" }
-            Token::RParen => { "RParen )" }
-            Token::LBrace => { "LBrace {" }
-            Token::RBrace => { "RBrace }" }
-            Token::Function => { "fn" }
-            Token::Let => { "let" }
-            Token::True => { "true" }
-            Token::False => { "false" }
-            Token::If => { "if" }
-            Token::Else => { "else" }
-            Token::Return => { "return" }
+            Token::Illegal => "Illegal",
+            Token::Eof => "Eof",
+            Token::Ident(ident) => &*ident,
+            Token::Int(value) => &*format!("{}", value),
+            Token::Assign => "=",
+            Token::Plus => "+",
+            Token::Minus => "-",
+            Token::Bang => "!",
+            Token::Asterisk => "*",
+            Token::Slash => "/",
+            Token::Eq => "==",
+            Token::NotEq => "!=",
+            Token::Lt => "<",
+            Token::Gt => ">",
+            Token::Comma => ",",
+            Token::Semicolon => ";",
+            Token::LParen => "(",
+            Token::RParen => ")",
+            Token::LBrace => "{",
+            Token::RBrace => "}",
+            Token::Function => "fn",
+            Token::Let => "let",
+            Token::True => "true",
+            Token::False => "false",
+            Token::If => "if",
+            Token::Else => "else",
+            Token::Return => "return",
         };
         write!(f, "{string}")
     }

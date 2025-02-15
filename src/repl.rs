@@ -1,6 +1,6 @@
-use std::io;
 use crate::lexer::Lexer;
 use crate::token::Token;
+use std::io;
 
 pub fn start<R: io::BufRead, W: io::Write>(mut reader: R, mut writer: W) -> io::Result<()> {
     println!("Hello I am bala, Feel free to type any text or commands");

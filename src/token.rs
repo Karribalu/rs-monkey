@@ -1,3 +1,4 @@
+use crate::parser::Precedence;
 use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -52,6 +53,15 @@ impl Token {
             "else" => Token::Else,
             "return" => Token::Return,
             _ => Token::Ident(ident.to_string()),
+        }
+    }
+    pub fn precedence(&self) -> Precedence {
+        match self {
+            Token::Eq | Token::NotEq => Precedence::Equals,
+            Token::Lt | Token::Gt => Precedence::LessGreater,
+            Token::Plus | Token::Minus => Precedence::Sum,
+            Token::Slash | Token::Asterisk => Precedence::Product,
+            _ => Precedence::Lowest,
         }
     }
 }

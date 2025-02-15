@@ -1,24 +1,27 @@
-use crate::ast::{Expression, ExpressionStatement, LetStatement, PrefixExpression, Program, ReturnStatement, Statement};
+use crate::ast::{Expression, ExpressionStatement, InfixExpression, LetStatement, PrefixExpression, Program, ReturnStatement, Statement};
 use crate::lexer::Lexer;
 use crate::token::Token;
 use std::cmp::PartialEq;
-use std::collections::HashMap;
 use std::num::ParseIntError;
 use thiserror::Error;
 
 type ParseResult<T> = Result<T, ParseError>;
+type PrefixFn = fn(parser: &mut Parser) -> ParseResult<Expression>;
+type InfixFn = fn(parser: &mut Parser, left: Expression) -> ParseResult<Expression>;
 #[derive(Error, Clone, Debug, Eq, PartialEq)]
 pub enum ParseError {
     #[error("Error while parsing the let statement: {0}")]
     LetSyntaxError(String),
-    #[error("Expected expression but got {0}")]
+    #[error("Expected expression but found {0}")]
     ExpressionFailed(String),
+    #[error("Expected identifier but found {0}")]
+    InvalidIdentifier(String),
     #[error(transparent)]
     InvalidIntegerParse(#[from] ParseIntError),
-    #[error("Expected integer but got {0}")]
+    #[error("Expected integer but found {0}")]
     IntegerParsingFailed(String),
-    #[error("Error while parsing")]
-    ParsingFailed,
+    #[error("Error while parsing: {0}")]
+    ParsingFailed(String),
 }
 #[derive(Debug)]
 pub struct Parser<'a> {
@@ -28,7 +31,7 @@ pub struct Parser<'a> {
     // pub prefix_parse_fns: HashMap<Token, dyn Fn<(), Output=Expression>>,
     // pub suffix_parse_fns: HashMap<Token, dyn Fn<Expression, Output = Expression>>,
 }
-enum Precedence {
+pub enum Precedence {
     Lowest,
     Equals,
     LessGreater, // > or <
@@ -38,7 +41,7 @@ enum Precedence {
     Call,
 }
 impl Precedence {
-    fn value(&self) -> u8 {
+    pub fn value(&self) -> u8 {
         match &self {
             Precedence::Lowest => 1,
             Precedence::Equals => 2,
@@ -67,6 +70,12 @@ impl<'a> Parser<'a> {
     pub fn next_token(&mut self) {
         self.curr_token = self.peek_token.clone();
         self.peek_token = self.lexer.next_token();
+    }
+    pub fn peek_precedence(&self) -> Precedence {
+        self.peek_token.precedence()
+    }
+    pub fn curr_precedence(&self) -> Precedence {
+        self.curr_token.precedence()
     }
 
     pub fn parse_program(&mut self) -> ParseResult<Program> {
@@ -115,32 +124,83 @@ impl<'a> Parser<'a> {
         Ok(Statement::Expression(exp))
     }
     pub fn parse_expression(&mut self, precedence: Precedence) -> ParseResult<Expression> {
+        // Get the corresponding prefix expression parser
+        let prefix = self.prefix_fn();
+        if prefix.is_none() {
+            Err(ParseError::ParsingFailed("Prefix operator was not found".to_string()))?
+        }
+        let mut left = prefix.unwrap()(self)?;
+        while !self.is_peek_token(Token::Semicolon) && precedence.value() < self.peek_precedence().value() {
+            // Get the corresponding infix expression parser
+            if let Some(infix) = self.infix_fn() {
+                self.next_token();
+                left = infix(self, left)?;
+            } else {
+                return Ok(left);
+            }
+        }
+        Ok(left)
+    }
+    pub fn parse_identifier(parser: &mut Parser) -> ParseResult<Expression> {
+        if let Token::Ident(ident) = &parser.curr_token {
+            return Ok(Expression::Identifier(ident.clone()));
+        }
+        Err(ParseError::InvalidIdentifier(parser.curr_token.to_string()))?
+    }
+    pub fn prefix_fn(&self) -> Option<PrefixFn> {
         match &self.curr_token {
-            Token::Ident(identifier) => Ok(Expression::Identifier(identifier.clone())),
-            Token::Int(integer) => Ok(Expression::Integer(*integer)),
-            Token::Bang | Token::Minus => Ok(self.parse_prefix_expression()?),
-            _ => Err(ParseError::ExpressionFailed(self.curr_token.to_string()))?,
+            Token::Ident(_) => Some(Parser::parse_identifier),
+            Token::Int(_) => Some(Parser::parse_integer),
+            Token::Bang | Token::Minus => Some(Parser::parse_prefix_expression),
+            _ => None
+        }
+    }
+    pub fn infix_fn(&self) -> Option<InfixFn> {
+        match &self.peek_token {
+            Token::Plus
+            | Token::Minus
+            | Token::Slash
+            | Token::Asterisk
+            | Token::Eq
+            | Token::NotEq
+            | Token::Lt
+            | Token::Gt => {
+                Some(Parser::parse_infix_expression)
+            }
+            _ => None
         }
     }
     // Currently not being used
-    pub fn parse_integer(&self) -> ParseResult<Expression> {
-        match &self.curr_token {
-            Token::Ident(ident) => {
-                let integer = ident.parse::<i64>()?;
-                Ok(Expression::Integer(integer))
-            }
-            _ => Err(ParseError::IntegerParsingFailed(
-                self.curr_token.to_string(),
-            )),
+    pub fn parse_integer(parser: &mut Parser) -> ParseResult<Expression> {
+        if let Token::Int(number) = &parser.curr_token {
+            return Ok(Expression::Integer(*number));
         }
+        Err(ParseError::IntegerParsingFailed(
+            parser.curr_token.to_string(),
+        ))?
     }
-    pub fn parse_prefix_expression(&mut self) -> ParseResult<Expression> {
-        let operator = self.curr_token.to_string();
-        self.next_token();
-        let right_exp = self.parse_expression(Precedence::Prefix)?;
+    pub fn parse_prefix_expression(parser: &mut Parser) -> ParseResult<Expression> {
+        let operator = parser.curr_token.to_string();
+        parser.next_token();
+        let right_exp = parser.parse_expression(Precedence::Prefix)?;
         Ok(Expression::Prefix(Box::new(PrefixExpression {
             operator,
             right: Box::new(right_exp),
+        })))
+    }
+    /**
+    Finds the current token precedence and parses the infix expression it accordingly
+
+    */
+    pub fn parse_infix_expression(parser: &mut Parser, left: Expression) -> ParseResult<Expression> {
+        let operator = parser.curr_token.to_string();
+        let precedence = parser.curr_precedence();
+        parser.next_token();
+        let right = parser.parse_expression(precedence)?;
+        Ok(Expression::Infix(Box::new(InfixExpression {
+            operator,
+            left: Box::new(left),
+            right: Box::new(right),
         })))
     }
     fn is_curr_token(&self, token: Token) -> bool {
@@ -170,7 +230,10 @@ impl<'a> Parser<'a> {
 }
 
 mod tests {
-    use crate::ast::{Expression, ExpressionStatement, LetStatement, PrefixExpression, ReturnStatement, Statement};
+    use crate::ast::{
+        Expression, ExpressionStatement, InfixExpression, LetStatement, PrefixExpression,
+        ReturnStatement, Statement,
+    };
     use crate::lexer::Lexer;
     use crate::parser::{ParseError, Parser};
     use crate::token::Token;
@@ -287,7 +350,6 @@ mod tests {
             operator: &'a str,
             value: i64,
         }
-        ;
         let tests = vec![
             Test {
                 input: "!5",
@@ -312,6 +374,82 @@ mod tests {
                 expression: Expression::Prefix(Box::from(PrefixExpression {
                     operator: test.operator.to_string(),
                     right: Box::new(Expression::Integer(test.value)),
+                })),
+            });
+            assert_eq!(expected, statements[0])
+        }
+    }
+    #[test]
+    fn test_infix_parsing() {
+        struct Test<'a> {
+            input: &'a str,
+            left_value: i64,
+            operator: &'a str,
+            right_value: i64,
+        }
+        let tests = vec![
+            Test {
+                input: "5 + 10;",
+                operator: "+",
+                left_value: 5,
+                right_value: 10,
+            },
+            Test {
+                input: "5 - 10;",
+                operator: "-",
+                left_value: 5,
+                right_value: 10,
+            },
+            Test {
+                input: "5 * 10;",
+                operator: "*",
+                left_value: 5,
+                right_value: 10,
+            },
+            Test {
+                input: "5 / 10;",
+                operator: "/",
+                left_value: 5,
+                right_value: 10,
+            },
+            Test {
+                input: "5 < 10;",
+                operator: "<",
+                left_value: 5,
+                right_value: 10,
+            },
+            Test {
+                input: "5 > 10;",
+                operator: ">",
+                left_value: 5,
+                right_value: 10,
+            },
+            Test {
+                input: "5 == 10;",
+                operator: "==",
+                left_value: 5,
+                right_value: 10,
+            },
+            Test {
+                input: "5 != 10;",
+                operator: "!=",
+                left_value: 5,
+                right_value: 10,
+            },
+        ];
+        for test in tests {
+            let input = &test.input.clone();
+            let lexer = Lexer::new(input);
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse_program();
+            assert!(program.is_ok());
+            let statements = program.unwrap().statements;
+            assert!(!statements.is_empty());
+            let expected = Statement::Expression(ExpressionStatement {
+                expression: Expression::Infix(Box::new(InfixExpression {
+                    left: Box::from(Expression::Integer(test.left_value)),
+                    operator: test.operator.to_string(),
+                    right: Box::from(Expression::Integer(test.right_value)),
                 })),
             });
             assert_eq!(expected, statements[0])

@@ -1,6 +1,6 @@
 use crate::ast::Statement::Let;
-use std::fmt::{Display, Formatter};
 use crate::token::Token;
+use std::fmt::{Display, Formatter};
 
 // enum Node {
 //     Program(),
@@ -50,6 +50,7 @@ pub enum Expression {
     Identifier(String),
     Integer(i64),
     Prefix(Box<PrefixExpression>),
+    Infix(Box<InfixExpression>),
     Something,
 }
 impl Display for Expression {
@@ -103,6 +104,18 @@ pub struct PrefixExpression {
 }
 impl Display for PrefixExpression {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}{}", self.operator, self.right)
+        write!(f, "{} {}", self.operator, self.right)
+    }
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct InfixExpression {
+    pub(crate) left: Box<Expression>,
+    pub(crate) operator: String,
+    pub(crate) right: Box<Expression>,
+}
+impl Display for InfixExpression {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {} {}", self.left, self.operator, self.right)
     }
 }

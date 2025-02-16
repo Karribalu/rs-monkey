@@ -146,6 +146,7 @@ impl<'a> Parser<'a> {
             Token::Int(_) => Some(Parser::parse_integer),
             Token::Bang | Token::Minus => Some(Parser::parse_prefix_expression),
             Token::True | Token::False => Some(Parser::parse_boolean),
+            Token::LParen => Some(Parser::parse_grouped_expressions),
             _ => None,
         }
     }
@@ -205,6 +206,15 @@ impl<'a> Parser<'a> {
         }
         Err(ParseError::InvalidBoolean(parser.curr_token.to_string()))
     }
+    pub fn parse_grouped_expressions(parser: &mut Parser) -> ParseResult<Expression> {
+        if parser.curr_token != Token::LParen {
+            Err(ParseError::ParsingFailed("L Paren not found".to_string()))?
+        }
+        parser.next_token();
+        let exp = parser.parse_expression(Precedence::Lowest)?;
+        parser.expect_peek(Token::RParen)?;
+        Ok(exp)
+    }
     fn is_curr_token(&self, token: Token) -> bool {
         self.curr_token == token
     }
@@ -212,12 +222,12 @@ impl<'a> Parser<'a> {
         self.peek_token == token
     }
     fn expect_peek(&mut self, token: Token) -> ParseResult<()> {
-        if self.is_peek_token(token) {
+        if self.is_peek_token(token.clone()) {
             self.next_token();
             return Ok(());
         }
-        Err(ParseError::LetSyntaxError(
-            "Assignment operator not found in the let statement".to_string(),
+        Err(ParseError::ParsingFailed(
+           format!( "Expected {} but found {}", &token, self.peek_token),
         ))
     }
     fn expect_ident(&mut self) -> Result<String, ParseError> {
@@ -232,7 +242,6 @@ impl<'a> Parser<'a> {
 }
 
 mod tests {
-    use crate::ast::Expression::Integer;
     use crate::ast::{
         Expression, ExpressionStatement, InfixExpression, LetStatement, PrefixExpression, Program,
         ReturnStatement, Statement,
@@ -518,9 +527,9 @@ mod tests {
             vec![Statement::Expression(ExpressionStatement {
                 expression: Expression::Infix(Box::from(InfixExpression {
                     left: Box::from(Expression::Infix(Box::from(InfixExpression {
-                        left: Box::from(Integer(10)),
+                        left: Box::from(Expression::Integer(10)),
                         operator: ">".to_string(),
-                        right: Box::from(Integer(15)),
+                        right: Box::from(Expression::Integer(15)),
                     }))),
                     operator: "==".to_string(),
                     right: Box::new(Expression::Boolean(false)),
@@ -529,9 +538,9 @@ mod tests {
             vec![Statement::Expression(ExpressionStatement {
                 expression: Expression::Infix(Box::from(InfixExpression {
                     left: Box::from(Expression::Infix(Box::from(InfixExpression {
-                        left: Box::from(Integer(10)),
+                        left: Box::from(Expression::Integer(10)),
                         operator: "<".to_string(),
-                        right: Box::from(Integer(12)),
+                        right: Box::from(Expression::Integer(12)),
                     }))),
                     operator: "==".to_string(),
                     right: Box::new(Expression::Boolean(true)),
@@ -545,6 +554,23 @@ mod tests {
             assert!(!statements.is_empty());
             assert_eq!(statements[0].to_string(), test.expected);
             assert_eq!(statements, statement_tests[idx])
+        }
+    }
+    #[test]
+    fn test_operator_precedence_parsing() {
+        let tests = vec![
+            Test::new("1 + (2 + 3) + 4", "((1 + (2 + 3)) + 4)"),
+            Test::new("(5 + 5) * 2", "((5 + 5) * 2)"),
+            Test::new("2 / (5 + 5)", "(2 / (5 + 5))"),
+            Test::new("-(5 + 5)", "(- (5 + 5))"),
+            Test::new("!(true == true)", "(! (true == true))"),
+        ];
+        for (_, test) in tests.iter().enumerate() {
+            let program = preload(&test.input);
+            assert!(program.is_ok());
+            let statements = program.unwrap().statements;
+            assert!(!statements.is_empty());
+            assert_eq!(statements[0].to_string(), test.expected);
         }
     }
 }

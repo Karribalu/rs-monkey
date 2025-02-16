@@ -1,7 +1,10 @@
-use crate::ast::{Expression, ExpressionStatement, InfixExpression, LetStatement, PrefixExpression, Program, ReturnStatement, Statement};
+use crate::ast::{
+    Expression, ExpressionStatement, InfixExpression, LetStatement, PrefixExpression, Program,
+    ReturnStatement, Statement,
+};
 use crate::lexer::Lexer;
 use crate::token::Token;
-use std::cmp::PartialEq;
+use std::cmp::{PartialEq, PartialOrd};
 use std::num::ParseIntError;
 use thiserror::Error;
 
@@ -31,6 +34,7 @@ pub struct Parser<'a> {
     // pub prefix_parse_fns: HashMap<Token, dyn Fn<(), Output=Expression>>,
     // pub suffix_parse_fns: HashMap<Token, dyn Fn<Expression, Output = Expression>>,
 }
+#[derive(PartialOrd, PartialEq)]
 pub enum Precedence {
     Lowest,
     Equals,
@@ -39,19 +43,6 @@ pub enum Precedence {
     Product,     // *
     Prefix,      // -X or !X
     Call,
-}
-impl Precedence {
-    pub fn value(&self) -> u8 {
-        match &self {
-            Precedence::Lowest => 1,
-            Precedence::Equals => 2,
-            Precedence::LessGreater => 3,
-            Precedence::Sum => 4,
-            Precedence::Product => 5,
-            Precedence::Prefix => 6,
-            Precedence::Call => 7,
-        }
-    }
 }
 
 impl<'a> Parser<'a> {
@@ -127,10 +118,12 @@ impl<'a> Parser<'a> {
         // Get the corresponding prefix expression parser
         let prefix = self.prefix_fn();
         if prefix.is_none() {
-            Err(ParseError::ParsingFailed("Prefix operator was not found".to_string()))?
+            Err(ParseError::ParsingFailed(
+                "Prefix operator was not found".to_string(),
+            ))?
         }
         let mut left = prefix.unwrap()(self)?;
-        while !self.is_peek_token(Token::Semicolon) && precedence.value() < self.peek_precedence().value() {
+        while !self.is_peek_token(Token::Semicolon) && precedence < self.peek_precedence() {
             // Get the corresponding infix expression parser
             if let Some(infix) = self.infix_fn() {
                 self.next_token();
@@ -152,7 +145,7 @@ impl<'a> Parser<'a> {
             Token::Ident(_) => Some(Parser::parse_identifier),
             Token::Int(_) => Some(Parser::parse_integer),
             Token::Bang | Token::Minus => Some(Parser::parse_prefix_expression),
-            _ => None
+            _ => None,
         }
     }
     pub fn infix_fn(&self) -> Option<InfixFn> {
@@ -164,10 +157,8 @@ impl<'a> Parser<'a> {
             | Token::Eq
             | Token::NotEq
             | Token::Lt
-            | Token::Gt => {
-                Some(Parser::parse_infix_expression)
-            }
-            _ => None
+            | Token::Gt => Some(Parser::parse_infix_expression),
+            _ => None,
         }
     }
     // Currently not being used
@@ -192,7 +183,10 @@ impl<'a> Parser<'a> {
     Finds the current token precedence and parses the infix expression it accordingly
 
     */
-    pub fn parse_infix_expression(parser: &mut Parser, left: Expression) -> ParseResult<Expression> {
+    pub fn parse_infix_expression(
+        parser: &mut Parser,
+        left: Expression,
+    ) -> ParseResult<Expression> {
         let operator = parser.curr_token.to_string();
         let precedence = parser.curr_precedence();
         parser.next_token();
@@ -237,6 +231,7 @@ mod tests {
     use crate::lexer::Lexer;
     use crate::parser::{ParseError, Parser};
     use crate::token::Token;
+    use std::ops::Add;
 
     #[test]
     fn test_let_parser() {
@@ -452,7 +447,55 @@ mod tests {
                     right: Box::from(Expression::Integer(test.right_value)),
                 })),
             });
+            println!("{}", statements[0]);
             assert_eq!(expected, statements[0])
+        }
+    }
+    #[test]
+    fn test_infix_parsing_2() {
+        struct Test<'a> {
+            input: &'a str,
+            expected: &'a str,
+        }
+        impl Test<'_> {
+            fn new<'a>(input: &'a str, expected: &'a str) -> Test<'a> {
+                Test { input, expected }
+            }
+        }
+        let tests = vec![
+            Test::new("-a * b", "((- a) * b)"),
+            Test::new("!-a", "(! (- a))"),
+            Test::new("a + b + c", "((a + b) + c)"),
+            Test::new("a + b - c", "((a + b) - c)"),
+            Test::new("a * b * c", "((a * b) * c)"),
+            Test::new("a * b / c", "((a * b) / c)"),
+            Test::new("a + b / c", "(a + (b / c))"),
+            Test::new("a + b * c + d / e - f", "(((a + (b * c)) + (d / e)) - f)"),
+            Test::new("3 + 4; -5 * 5", "(3 + 4)((- 5) * 5)"),
+            Test::new("5 < 4 != 3 > 4", "((5 < 4) != (3 > 4))"),
+            Test::new(
+                "3 + 4 * 5 == 3 * 1 + 4 * 5",
+                "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
+            ),
+            Test::new(
+                "3 + 4 * 5 == 3 * 1 + 4 * 5",
+                "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
+            ),
+        ];
+        for test in tests {
+            let input = &test.input.clone();
+            let lexer = Lexer::new(input);
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse_program();
+            assert!(program.is_ok());
+            let statements = program.unwrap().statements;
+            assert!(!statements.is_empty());
+            // println!("{}", statements.concat());
+            let mut joined_string = String::new();
+            for statement in &statements {
+                joined_string = joined_string.add(&*statement.to_string());
+            }
+            assert_eq!(joined_string, test.expected);
         }
     }
 }

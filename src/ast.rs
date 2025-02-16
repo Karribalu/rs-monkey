@@ -1,11 +1,6 @@
 use crate::ast::Statement::Let;
-use crate::token::Token;
 use std::fmt::{Display, Formatter};
 
-// enum Node {
-//     Program(),
-//     Statement
-// }
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Program {
     pub statements: Vec<Statement>,
@@ -34,13 +29,13 @@ impl Display for Statement {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Let(let_statement) => {
-                write!(f, "let {};", let_statement)
+                write!(f, "let {}", let_statement)
             }
             Statement::Return(return_statement) => {
-                write!(f, "return {};", return_statement)
+                write!(f, "return {}", return_statement)
             }
             Statement::Expression(ex) => {
-                write!(f, "{};", ex)
+                write!(f, "{}", ex)
             }
         }
     }
@@ -55,7 +50,23 @@ pub enum Expression {
 }
 impl Display for Expression {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "{}", "something")
+        match self {
+            Expression::Identifier(ident) => {
+                write!(f, "{}", ident)
+            }
+            Expression::Integer(integer) => {
+                write!(f, "{}", integer)
+            }
+            Expression::Prefix(prefix) => {
+                write!(f, "{}", prefix)
+            }
+            Expression::Infix(infix) => {
+                write!(f, "{}", infix)
+            }
+            Expression::Something => {
+                write!(f, "something")
+            }
+        }
     }
 }
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -104,7 +115,7 @@ pub struct PrefixExpression {
 }
 impl Display for PrefixExpression {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {}", self.operator, self.right)
+        write!(f, "({} {})", self.operator, self.right)
     }
 }
 
@@ -116,6 +127,6 @@ pub struct InfixExpression {
 }
 impl Display for InfixExpression {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {} {}", self.left, self.operator, self.right)
+        write!(f, "({} {} {})", self.left, self.operator, self.right)
     }
 }

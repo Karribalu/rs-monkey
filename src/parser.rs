@@ -1,7 +1,4 @@
-use crate::ast::{
-    Expression, ExpressionStatement, InfixExpression, LetStatement, PrefixExpression, Program,
-    ReturnStatement, Statement,
-};
+use crate::ast::{BlockStatement, Expression, ExpressionStatement, IfExpression, InfixExpression, LetStatement, PrefixExpression, Program, ReturnStatement, Statement};
 use crate::lexer::Lexer;
 use crate::token::Token;
 use std::cmp::{PartialEq, PartialOrd};
@@ -147,6 +144,7 @@ impl<'a> Parser<'a> {
             Token::Bang | Token::Minus => Some(Parser::parse_prefix_expression),
             Token::True | Token::False => Some(Parser::parse_boolean),
             Token::LParen => Some(Parser::parse_grouped_expressions),
+            Token::If => Some(Parser::parse_if_expression),
             _ => None,
         }
     }
@@ -215,6 +213,41 @@ impl<'a> Parser<'a> {
         parser.expect_peek(Token::RParen)?;
         Ok(exp)
     }
+    pub fn parse_if_expression(parser: &mut Parser) -> ParseResult<Expression> {
+        parser.expect_peek(Token::LParen)?;
+        parser.next_token();
+
+        let condition = parser.parse_expression(Precedence::Lowest)?;
+
+        parser.expect_peek(Token::RParen)?;
+        parser.expect_peek(Token::LBrace)?;
+
+        let consequence = parser.parse_block_statement()?;
+        let mut alternate = None;
+        if parser.is_peek_token(Token::Else) {
+            parser.next_token();
+            parser.expect_peek(Token::LBrace)?;
+            alternate = Some(parser.parse_block_statement()?);
+        }
+        Ok(Expression::If(Box::new(IfExpression {
+            condition,
+            consequence,
+            alternative: alternate,
+        })))
+    }
+    pub fn parse_block_statement(&mut self) -> ParseResult<BlockStatement> {
+        let mut statements: Vec<Statement> = vec![];
+        self.next_token();
+
+        while !self.is_curr_token(Token::RBrace) && !self.is_curr_token(Token::Eof) {
+            let stmt = self.parse_statement()?;
+            statements.push(stmt);
+            self.next_token();
+        }
+        Ok(BlockStatement {
+            statements
+        })
+    }
     fn is_curr_token(&self, token: Token) -> bool {
         self.curr_token == token
     }
@@ -226,9 +259,10 @@ impl<'a> Parser<'a> {
             self.next_token();
             return Ok(());
         }
-        Err(ParseError::ParsingFailed(
-           format!( "Expected {} but found {}", &token, self.peek_token),
-        ))
+        Err(ParseError::ParsingFailed(format!(
+            "Expected {} but found {}",
+            &token, self.peek_token
+        )))
     }
     fn expect_ident(&mut self) -> Result<String, ParseError> {
         match &self.peek_token {
@@ -242,14 +276,12 @@ impl<'a> Parser<'a> {
 }
 
 mod tests {
-    use crate::ast::{
-        Expression, ExpressionStatement, InfixExpression, LetStatement, PrefixExpression, Program,
-        ReturnStatement, Statement,
-    };
+    use crate::ast::{BlockStatement, Expression, ExpressionStatement, IfExpression, InfixExpression, LetStatement, PrefixExpression, Program, ReturnStatement, Statement};
     use crate::lexer::Lexer;
     use crate::parser::{ParseError, ParseResult, Parser};
     use crate::token::Token;
     use std::ops::Add;
+    use crate::ast::Expression::Identifier;
 
     struct Test<'a> {
         input: &'a str,
@@ -571,6 +603,65 @@ mod tests {
             let statements = program.unwrap().statements;
             assert!(!statements.is_empty());
             assert_eq!(statements[0].to_string(), test.expected);
+        }
+    }
+    #[test]
+    fn test_if_expression() {
+        let input = "if (x < y) {x}";
+        let program = preload(input);
+        assert!(program.is_ok());
+        let statements = &program.clone().unwrap().statements;
+        assert!(!statements.is_empty());
+        let expected = vec![Statement::Expression(ExpressionStatement {
+            expression: Expression::If(Box::new(IfExpression {
+                condition: Expression::Infix(Box::new(InfixExpression {
+                    left: Box::from(Identifier("x".to_string())),
+                    operator: "<".to_string(),
+                    right: Box::from(Identifier("y".to_string()))
+                })),
+                consequence: BlockStatement {
+                    statements: vec![Statement::Expression(ExpressionStatement {
+                        expression: Identifier("x".to_string()),
+                    })]
+                },
+                alternative: None,
+            }))
+        })];
+        for i in 0..expected.len() {
+            assert_eq!(statements[i], expected[i]);
+        }
+    }
+    #[test]
+    fn test_if_else_expression() {
+        let input = "if (x < y)\
+        { x } else {\
+            y
+        }";
+        let program = preload(input);
+        assert!(program.is_ok());
+        let statements = &program.clone().unwrap().statements;
+        assert!(!statements.is_empty());
+        let expected = vec![Statement::Expression(ExpressionStatement {
+            expression: Expression::If(Box::new(IfExpression {
+                condition: Expression::Infix(Box::new(InfixExpression {
+                    left: Box::from(Identifier("x".to_string())),
+                    operator: "<".to_string(),
+                    right: Box::from(Identifier("y".to_string()))
+                })),
+                consequence: BlockStatement {
+                    statements: vec![Statement::Expression(ExpressionStatement {
+                        expression: Identifier("x".to_string()),
+                    })]
+                },
+                alternative: Some(BlockStatement {
+                    statements: vec![Statement::Expression(ExpressionStatement {
+                        expression: Identifier("y".to_string()),
+                    })]
+                }),
+            }))
+        })];
+        for i in 0..expected.len() {
+            assert_eq!(statements[i], expected[i]);
         }
     }
 }

@@ -8,7 +8,7 @@ pub struct Program {
 impl Display for Program {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         for statement in &self.statements {
-            writeln!(f, "{}", &statement)?
+            writeln!(f, "{}\n", &statement)?
         }
         write!(f, "")
     }
@@ -16,6 +16,19 @@ impl Display for Program {
 impl Program {
     pub(crate) fn new() -> Self {
         Self { statements: vec![] }
+    }
+}
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct BlockStatement {
+    pub(crate) statements: Vec<Statement>,
+}
+
+impl Display for BlockStatement {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        for statement in &self.statements {
+            writeln!(f, "{}\n", &statement)?
+        }
+        write!(f, "")
     }
 }
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -47,6 +60,7 @@ pub enum Expression {
     Boolean(bool),
     Prefix(Box<PrefixExpression>),
     Infix(Box<InfixExpression>),
+    If(Box<IfExpression>),
     Something,
 }
 impl Display for Expression {
@@ -67,6 +81,7 @@ impl Display for Expression {
             Expression::Boolean(boolean) => {
                 write!(f, "{}", boolean.to_string())
             }
+            Expression::If(if_expression) => write!(f, "if {}", if_expression),
             Expression::Something => {
                 write!(f, "something")
             }
@@ -132,5 +147,28 @@ pub struct InfixExpression {
 impl Display for InfixExpression {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "({} {} {})", self.left, self.operator, self.right)
+    }
+}
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct IfExpression {
+    pub(crate) condition: Expression,
+    pub(crate) consequence: BlockStatement,
+    pub(crate) alternative: Option<BlockStatement>,
+}
+impl Display for IfExpression {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        if self.alternative.is_some() {
+            write!(
+                f,
+                "{} {{ {} }}  else {{ {} }}",
+                self.condition, self.consequence, self.alternative.clone().unwrap()
+            )
+        } else {
+            write!(
+                f,
+                "{} {{ {} }}",
+                self.condition, self.consequence
+            )
+        }
     }
 }

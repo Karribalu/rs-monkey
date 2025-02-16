@@ -44,6 +44,7 @@ impl Display for Statement {
 pub enum Expression {
     Identifier(String),
     Integer(i64),
+    Boolean(bool),
     Prefix(Box<PrefixExpression>),
     Infix(Box<InfixExpression>),
     Something,
@@ -62,6 +63,9 @@ impl Display for Expression {
             }
             Expression::Infix(infix) => {
                 write!(f, "{}", infix)
+            }
+            Expression::Boolean(boolean) => {
+                write!(f, "{}", boolean.to_string())
             }
             Expression::Something => {
                 write!(f, "something")

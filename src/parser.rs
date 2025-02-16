@@ -15,14 +15,14 @@ type InfixFn = fn(parser: &mut Parser, left: Expression) -> ParseResult<Expressi
 pub enum ParseError {
     #[error("Error while parsing the let statement: {0}")]
     LetSyntaxError(String),
-    #[error("Expected expression but found {0}")]
-    ExpressionFailed(String),
     #[error("Expected identifier but found {0}")]
     InvalidIdentifier(String),
     #[error(transparent)]
     InvalidIntegerParse(#[from] ParseIntError),
     #[error("Expected integer but found {0}")]
     IntegerParsingFailed(String),
+    #[error("Expected boolean but found {0}")]
+    InvalidBoolean(String),
     #[error("Error while parsing: {0}")]
     ParsingFailed(String),
 }
@@ -145,6 +145,7 @@ impl<'a> Parser<'a> {
             Token::Ident(_) => Some(Parser::parse_identifier),
             Token::Int(_) => Some(Parser::parse_integer),
             Token::Bang | Token::Minus => Some(Parser::parse_prefix_expression),
+            Token::True | Token::False => Some(Parser::parse_boolean),
             _ => None,
         }
     }
@@ -197,6 +198,13 @@ impl<'a> Parser<'a> {
             right: Box::new(right),
         })))
     }
+
+    pub fn parse_boolean(parser: &mut Parser) -> ParseResult<Expression> {
+        if parser.curr_token == Token::True || parser.curr_token == Token::False {
+            return Ok(Expression::Boolean(parser.curr_token == Token::True));
+        }
+        Err(ParseError::InvalidBoolean(parser.curr_token.to_string()))
+    }
     fn is_curr_token(&self, token: Token) -> bool {
         self.curr_token == token
     }
@@ -224,23 +232,37 @@ impl<'a> Parser<'a> {
 }
 
 mod tests {
+    use crate::ast::Expression::Integer;
     use crate::ast::{
-        Expression, ExpressionStatement, InfixExpression, LetStatement, PrefixExpression,
+        Expression, ExpressionStatement, InfixExpression, LetStatement, PrefixExpression, Program,
         ReturnStatement, Statement,
     };
     use crate::lexer::Lexer;
-    use crate::parser::{ParseError, Parser};
+    use crate::parser::{ParseError, ParseResult, Parser};
     use crate::token::Token;
     use std::ops::Add;
 
+    struct Test<'a> {
+        input: &'a str,
+        expected: &'a str,
+    }
+    impl Test<'_> {
+        fn new<'a>(input: &'a str, expected: &'a str) -> Test<'a> {
+            Test { input, expected }
+        }
+    }
+    fn preload(inp: &str) -> ParseResult<Program> {
+        let lexer = Lexer::new(inp);
+        let mut parser = Parser::new(lexer);
+        parser.parse_program()
+    }
     #[test]
     fn test_let_parser() {
         let input = "let x = 5;
             let y = 10;
             let foobar = 838383;";
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-        let program = parser.parse_program();
+        let program = preload(input);
+
         assert!(program.is_ok());
         let statements = program.unwrap().statements;
         assert_eq!(statements.len(), 3);
@@ -268,9 +290,7 @@ mod tests {
         let input = "let x = 5;
             let = 10;
             let foobar = 838383;";
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-        let program = parser.parse_program();
+        let program = preload(input);
         assert!(program.is_err());
         assert_eq!(
             program,
@@ -358,10 +378,7 @@ mod tests {
             },
         ];
         for test in tests {
-            let input = &test.input.clone();
-            let lexer = Lexer::new(input);
-            let mut parser = Parser::new(lexer);
-            let program = parser.parse_program();
+            let program = preload(&test.input);
             assert!(program.is_ok());
             let statements = program.unwrap().statements;
             assert!(!statements.is_empty());
@@ -433,10 +450,7 @@ mod tests {
             },
         ];
         for test in tests {
-            let input = &test.input.clone();
-            let lexer = Lexer::new(input);
-            let mut parser = Parser::new(lexer);
-            let program = parser.parse_program();
+            let program = preload(&test.input);
             assert!(program.is_ok());
             let statements = program.unwrap().statements;
             assert!(!statements.is_empty());
@@ -453,15 +467,6 @@ mod tests {
     }
     #[test]
     fn test_infix_parsing_2() {
-        struct Test<'a> {
-            input: &'a str,
-            expected: &'a str,
-        }
-        impl Test<'_> {
-            fn new<'a>(input: &'a str, expected: &'a str) -> Test<'a> {
-                Test { input, expected }
-            }
-        }
         let tests = vec![
             Test::new("-a * b", "((- a) * b)"),
             Test::new("!-a", "(! (- a))"),
@@ -483,10 +488,7 @@ mod tests {
             ),
         ];
         for test in tests {
-            let input = &test.input.clone();
-            let lexer = Lexer::new(input);
-            let mut parser = Parser::new(lexer);
-            let program = parser.parse_program();
+            let program = preload(&test.input);
             assert!(program.is_ok());
             let statements = program.unwrap().statements;
             assert!(!statements.is_empty());
@@ -496,6 +498,53 @@ mod tests {
                 joined_string = joined_string.add(&*statement.to_string());
             }
             assert_eq!(joined_string, test.expected);
+        }
+    }
+    #[test]
+    fn test_boolean_parsing() {
+        let tests = vec![
+            Test::new("true;", "true"),
+            Test::new("false;", "false"),
+            Test::new("10 > 15 == false", "((10 > 15) == false)"),
+            Test::new("10 < 12 == true", "((10 < 12) == true)"),
+        ];
+        let statement_tests = vec![
+            vec![Statement::Expression(ExpressionStatement {
+                expression: Expression::Boolean(true),
+            })],
+            vec![Statement::Expression(ExpressionStatement {
+                expression: Expression::Boolean(false),
+            })],
+            vec![Statement::Expression(ExpressionStatement {
+                expression: Expression::Infix(Box::from(InfixExpression {
+                    left: Box::from(Expression::Infix(Box::from(InfixExpression {
+                        left: Box::from(Integer(10)),
+                        operator: ">".to_string(),
+                        right: Box::from(Integer(15)),
+                    }))),
+                    operator: "==".to_string(),
+                    right: Box::new(Expression::Boolean(false)),
+                })),
+            })],
+            vec![Statement::Expression(ExpressionStatement {
+                expression: Expression::Infix(Box::from(InfixExpression {
+                    left: Box::from(Expression::Infix(Box::from(InfixExpression {
+                        left: Box::from(Integer(10)),
+                        operator: "<".to_string(),
+                        right: Box::from(Integer(12)),
+                    }))),
+                    operator: "==".to_string(),
+                    right: Box::new(Expression::Boolean(true)),
+                })),
+            })],
+        ];
+        for (idx, test) in tests.iter().enumerate() {
+            let program = preload(&test.input);
+            assert!(program.is_ok());
+            let statements = program.unwrap().statements;
+            assert!(!statements.is_empty());
+            assert_eq!(statements[0].to_string(), test.expected);
+            assert_eq!(statements, statement_tests[idx])
         }
     }
 }

@@ -1,7 +1,7 @@
 use crate::ast::{
-    BlockStatement, Expression, ExpressionStatement, FunctionLiteral, IdentifierExpression,
-    IfExpression, InfixExpression, LetStatement, PrefixExpression, Program, ReturnStatement,
-    Statement,
+    BlockStatement, CallExpression, Expression, ExpressionStatement, FunctionLiteral,
+    IdentifierExpression, IfExpression, InfixExpression, LetStatement, PrefixExpression, Program,
+    ReturnStatement, Statement,
 };
 use crate::lexer::Lexer;
 use crate::token::Token;
@@ -159,6 +159,7 @@ impl<'a> Parser<'a> {
             | Token::NotEq
             | Token::Lt
             | Token::Gt => Some(Parser::parse_infix_expression),
+            Token::LParen => Some(Parser::parse_call_expression),
             _ => None,
         }
     }
@@ -277,6 +278,30 @@ impl<'a> Parser<'a> {
             body: Box::new(body),
         }))
     }
+    fn parse_call_expression(parser: &mut Parser, function: Expression) -> ParseResult<Expression> {
+        let arguments = parser.parse_call_arguments()?;
+        Ok(Expression::Call(CallExpression {
+            arguments,
+            function: Box::new(function),
+        }))
+    }
+    fn parse_call_arguments(&mut self) -> ParseResult<Vec<Box<Expression>>> {
+        let mut arguments = vec![];
+        if self.is_peek_token(Token::RParen) {
+            self.next_token();
+            return Ok(arguments);
+        }
+        self.next_token();
+        arguments.push(Box::new(self.parse_expression(Precedence::Lowest)?));
+        while self.is_peek_token(Token::Comma) {
+            self.next_token();
+            self.next_token();
+            arguments.push(Box::new(self.parse_expression(Precedence::Lowest)?));
+        }
+        self.expect_peek(Token::RParen)?;
+
+        Ok(arguments)
+    }
     fn is_curr_token(&self, token: Token) -> bool {
         self.curr_token == token
     }
@@ -307,9 +332,9 @@ impl<'a> Parser<'a> {
 mod tests {
     use crate::ast::Expression::Identifier;
     use crate::ast::{
-        BlockStatement, Expression, ExpressionStatement, FunctionLiteral, IdentifierExpression,
-        IfExpression, InfixExpression, LetStatement, PrefixExpression, Program, ReturnStatement,
-        Statement,
+        BlockStatement, CallExpression, Expression, ExpressionStatement, FunctionLiteral,
+        IdentifierExpression, IfExpression, InfixExpression, LetStatement, PrefixExpression,
+        Program, ReturnStatement, Statement,
     };
     use crate::lexer::Lexer;
     use crate::parser::{ParseError, ParseResult, Parser};
@@ -738,5 +763,56 @@ mod tests {
         let statements = &program.clone().unwrap().statements;
         assert!(!statements.is_empty());
         println!("{:?}", statements);
+    }
+    #[test]
+    fn test_call_expression_parsing() {
+        let input = "add(1, 2, 3*5)";
+        let program = preload(input);
+        let expected = vec![Statement::Expression(ExpressionStatement {
+            expression: Expression::Call(CallExpression {
+                function: Box::new(Identifier("add".to_string())),
+                arguments: vec![
+                    Box::new(Expression::Integer(1)),
+                    Box::new(Expression::Integer(2)),
+                    Box::new(Expression::Infix(Box::new(InfixExpression {
+                        left: Box::from(Expression::Integer(3)),
+                        operator: "*".to_string(),
+                        right: Box::new(Expression::Integer(5)),
+                    }))),
+                ],
+            }),
+        })];
+        println!("{:?}", program);
+        assert!(program.is_ok());
+        let statements = &program.clone().unwrap().statements;
+        for i in 0..statements.len() {
+            assert_eq!(statements[i], expected[i])
+        }
+    }
+    #[test]
+    fn test_more_call_expressions() {
+        let tests = vec![
+            Test::new("a + add(b * c) + d", "((a + add((b * c))) + d)"),
+            Test::new(
+                "add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))",
+                "add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))",
+            ),
+            Test::new(
+                "add(a + b + c * d / f + g)",
+                "add((((a + b) + ((c * d) / f)) + g))",
+            ),
+        ];
+        for test in tests {
+            let program = preload(&test.input);
+            assert!(program.is_ok());
+            let statements = program.unwrap().statements;
+            let joined_statements = statements
+                .iter()
+                .map(|item| item.to_string())
+                .collect::<Vec<String>>()
+                .join("");
+            assert!(!statements.is_empty());
+            assert_eq!(joined_statements, test.expected);
+        }
     }
 }

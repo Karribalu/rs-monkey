@@ -61,6 +61,7 @@ impl Token {
             Token::Lt | Token::Gt => Precedence::LessGreater,
             Token::Plus | Token::Minus => Precedence::Sum,
             Token::Slash | Token::Asterisk => Precedence::Product,
+            Token::LParen => Precedence::Call,
             _ => Precedence::Lowest,
         }
     }

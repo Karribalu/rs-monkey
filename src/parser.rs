@@ -1,4 +1,8 @@
-use crate::ast::{BlockStatement, Expression, ExpressionStatement, IfExpression, InfixExpression, LetStatement, PrefixExpression, Program, ReturnStatement, Statement};
+use crate::ast::{
+    BlockStatement, Expression, ExpressionStatement, FunctionLiteral, IdentifierExpression,
+    IfExpression, InfixExpression, LetStatement, PrefixExpression, Program, ReturnStatement,
+    Statement,
+};
 use crate::lexer::Lexer;
 use crate::token::Token;
 use std::cmp::{PartialEq, PartialOrd};
@@ -28,8 +32,6 @@ pub struct Parser<'a> {
     pub lexer: Lexer<'a>,
     pub curr_token: Token,
     pub peek_token: Token,
-    // pub prefix_parse_fns: HashMap<Token, dyn Fn<(), Output=Expression>>,
-    // pub suffix_parse_fns: HashMap<Token, dyn Fn<Expression, Output = Expression>>,
 }
 #[derive(PartialOrd, PartialEq)]
 pub enum Precedence {
@@ -51,8 +53,6 @@ impl<'a> Parser<'a> {
             lexer: l,
             curr_token: curr,
             peek_token: next,
-            // prefix_parse_fns: HashMap::new(),
-            // suffix_parse_fns: HashMap::new(),
         }
     }
     pub fn next_token(&mut self) {
@@ -71,6 +71,7 @@ impl<'a> Parser<'a> {
         while self.curr_token != Token::Eof {
             let stmt = self.parse_statement()?;
             program.statements.push(stmt);
+            // The last token for block `}` will be skipped here
             self.next_token();
         }
         Ok(program)
@@ -81,7 +82,6 @@ impl<'a> Parser<'a> {
             Token::Return => self.parse_return_statement(),
             _ => self.parse_expression_statement(),
         }
-        // Err(ParseError::ParsingFailed)
     }
     pub fn parse_let_statement(&mut self) -> ParseResult<Statement> {
         let name = self.expect_ident()?;
@@ -145,6 +145,7 @@ impl<'a> Parser<'a> {
             Token::True | Token::False => Some(Parser::parse_boolean),
             Token::LParen => Some(Parser::parse_grouped_expressions),
             Token::If => Some(Parser::parse_if_expression),
+            Token::Function => Some(Parser::parse_fn_statement),
             _ => None,
         }
     }
@@ -224,6 +225,7 @@ impl<'a> Parser<'a> {
 
         let consequence = parser.parse_block_statement()?;
         let mut alternate = None;
+        // The cursor is at `}`
         if parser.is_peek_token(Token::Else) {
             parser.next_token();
             parser.expect_peek(Token::LBrace)?;
@@ -237,6 +239,8 @@ impl<'a> Parser<'a> {
     }
     pub fn parse_block_statement(&mut self) -> ParseResult<BlockStatement> {
         let mut statements: Vec<Statement> = vec![];
+        // We will be at before { i.e., at condition end at if or at else part,
+        // Advance to move the cursor to the `{`
         self.next_token();
 
         while !self.is_curr_token(Token::RBrace) && !self.is_curr_token(Token::Eof) {
@@ -244,9 +248,34 @@ impl<'a> Parser<'a> {
             statements.push(stmt);
             self.next_token();
         }
-        Ok(BlockStatement {
-            statements
-        })
+        Ok(BlockStatement { statements })
+    }
+    pub fn parse_fn_statement(parser: &mut Parser) -> ParseResult<Expression> {
+        parser.expect_peek(Token::LParen)?;
+        parser.next_token();
+        let mut parameters = vec![];
+        while !parser.is_curr_token(Token::RParen) && !parser.is_curr_token(Token::Eof) {
+            if parser.is_curr_token(Token::Comma) {
+                parser.next_token();
+                continue;
+            }
+            parameters.push(IdentifierExpression {
+                value: parser.curr_token.clone().to_string(),
+            });
+            parser.next_token();
+        }
+        if parser.is_curr_token(Token::Eof) {
+            // Function ended abruptly;
+            Err(ParseError::ParsingFailed(
+                "Expected the function block".to_string(),
+            ))?
+        }
+        parser.next_token();
+        let body = parser.parse_block_statement()?;
+        Ok(Expression::Function(FunctionLiteral {
+            parameters,
+            body: Box::new(body),
+        }))
     }
     fn is_curr_token(&self, token: Token) -> bool {
         self.curr_token == token
@@ -276,12 +305,16 @@ impl<'a> Parser<'a> {
 }
 
 mod tests {
-    use crate::ast::{BlockStatement, Expression, ExpressionStatement, IfExpression, InfixExpression, LetStatement, PrefixExpression, Program, ReturnStatement, Statement};
+    use crate::ast::Expression::Identifier;
+    use crate::ast::{
+        BlockStatement, Expression, ExpressionStatement, FunctionLiteral, IdentifierExpression,
+        IfExpression, InfixExpression, LetStatement, PrefixExpression, Program, ReturnStatement,
+        Statement,
+    };
     use crate::lexer::Lexer;
     use crate::parser::{ParseError, ParseResult, Parser};
     use crate::token::Token;
     use std::ops::Add;
-    use crate::ast::Expression::Identifier;
 
     struct Test<'a> {
         input: &'a str,
@@ -617,15 +650,15 @@ mod tests {
                 condition: Expression::Infix(Box::new(InfixExpression {
                     left: Box::from(Identifier("x".to_string())),
                     operator: "<".to_string(),
-                    right: Box::from(Identifier("y".to_string()))
+                    right: Box::from(Identifier("y".to_string())),
                 })),
                 consequence: BlockStatement {
                     statements: vec![Statement::Expression(ExpressionStatement {
                         expression: Identifier("x".to_string()),
-                    })]
+                    })],
                 },
                 alternative: None,
-            }))
+            })),
         })];
         for i in 0..expected.len() {
             assert_eq!(statements[i], expected[i]);
@@ -646,22 +679,64 @@ mod tests {
                 condition: Expression::Infix(Box::new(InfixExpression {
                     left: Box::from(Identifier("x".to_string())),
                     operator: "<".to_string(),
-                    right: Box::from(Identifier("y".to_string()))
+                    right: Box::from(Identifier("y".to_string())),
                 })),
                 consequence: BlockStatement {
                     statements: vec![Statement::Expression(ExpressionStatement {
                         expression: Identifier("x".to_string()),
-                    })]
+                    })],
                 },
                 alternative: Some(BlockStatement {
                     statements: vec![Statement::Expression(ExpressionStatement {
                         expression: Identifier("y".to_string()),
-                    })]
+                    })],
                 }),
-            }))
+            })),
         })];
         for i in 0..expected.len() {
             assert_eq!(statements[i], expected[i]);
         }
+    }
+    #[test]
+    fn test_fn_literal_parsing() {
+        let input = "fn(x, y) { x + y; }";
+        let program = preload(input);
+        assert!(program.is_ok());
+        let statements = &program.clone().unwrap().statements;
+        assert!(!statements.is_empty());
+        let expected = vec![Statement::Expression(ExpressionStatement {
+            expression: Expression::Function(FunctionLiteral {
+                parameters: vec![
+                    IdentifierExpression {
+                        value: "x".to_string(),
+                    },
+                    IdentifierExpression {
+                        value: "y".to_string(),
+                    },
+                ],
+                body: Box::new(BlockStatement {
+                    statements: vec![Statement::Expression(ExpressionStatement {
+                        expression: Expression::Infix(Box::from(InfixExpression {
+                            left: Box::new(Identifier("x".to_string())),
+                            operator: "+".to_string(),
+                            right: Box::new(Identifier("y".to_string())),
+                        })),
+                    })],
+                }),
+            }),
+        })];
+        for i in 0..expected.len() {
+            assert_eq!(statements[i], expected[i]);
+        }
+    }
+    #[test]
+    fn test_more_fn_literal_parsing() {
+        let input = "fn(x, y) { return a + b;}";
+        let program = preload(input);
+        println!("{:?}", program);
+        assert!(program.is_ok());
+        let statements = &program.clone().unwrap().statements;
+        assert!(!statements.is_empty());
+        println!("{:?}", statements);
     }
 }

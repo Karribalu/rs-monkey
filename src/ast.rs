@@ -61,6 +61,7 @@ pub enum Expression {
     Prefix(Box<PrefixExpression>),
     Infix(Box<InfixExpression>),
     If(Box<IfExpression>),
+    Function(FunctionLiteral),
     Something,
 }
 impl Display for Expression {
@@ -85,6 +86,9 @@ impl Display for Expression {
             Expression::Something => {
                 write!(f, "something")
             }
+            Expression::Function(function) => {
+                write!(f, "fn {}", function)
+            }
         }
     }
 }
@@ -98,15 +102,16 @@ impl Display for LetStatement {
         write!(f, "{} = {}", self.name, self.value)
     }
 }
-// #[derive(Debug, Clone, Eq, PartialEq)]
-// pub struct Identifier {
-//     pub(crate) value: String,
-// }
-// impl Display for Identifier {
-//     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-//         write!(f, "{}", self.value)
-//     }
-// }
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct IdentifierExpression {
+    pub(crate) value: String,
+}
+impl Display for IdentifierExpression {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.value)
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ReturnStatement {
     pub(crate) value: Expression,
@@ -161,14 +166,59 @@ impl Display for IfExpression {
             write!(
                 f,
                 "{} {{ {} }}  else {{ {} }}",
-                self.condition, self.consequence, self.alternative.clone().unwrap()
+                self.condition,
+                self.consequence,
+                self.alternative.clone().unwrap()
             )
         } else {
-            write!(
-                f,
-                "{} {{ {} }}",
-                self.condition, self.consequence
-            )
+            write!(f, "{} {{ {} }}", self.condition, self.consequence)
         }
+    }
+}
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct FunctionLiteral {
+    pub(crate) parameters: Vec<IdentifierExpression>,
+    pub(crate) body: Box<BlockStatement>,
+}
+
+impl Display for FunctionLiteral {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "({}) {{ {} }}",
+            self.parameters
+                .iter()
+                .map(|item| item.to_string())
+                .collect::<Vec<String>>()
+                .join(","),
+            self.body
+        )
+    }
+}
+
+mod tests {
+    use crate::ast::Expression::Identifier;
+    use crate::ast::{
+        BlockStatement, ExpressionStatement, FunctionLiteral, IdentifierExpression, Statement,
+    };
+
+    #[test]
+    fn test() {
+        let hello = FunctionLiteral {
+            parameters: vec![
+                IdentifierExpression {
+                    value: "x".to_string(),
+                },
+                IdentifierExpression {
+                    value: "y".to_string(),
+                },
+            ],
+            body: Box::new(BlockStatement {
+                statements: vec![Statement::Expression(ExpressionStatement {
+                    expression: Identifier("x".to_string()),
+                })],
+            }),
+        };
+        println!("{}", hello);
     }
 }

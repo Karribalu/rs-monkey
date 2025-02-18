@@ -88,16 +88,17 @@ impl<'a> Parser<'a> {
         let value;
         self.next_token();
         self.expect_peek(Token::Assign)?;
+        self.next_token();
+        value = self.parse_expression(Precedence::Lowest)?;
         while !self.is_curr_token(Token::Semicolon) {
             self.next_token();
         }
-        value = Expression::Something;
         Ok(Statement::Let(LetStatement { name, value }))
     }
     pub fn parse_return_statement(&mut self) -> ParseResult<Statement> {
-        let expression = Expression::Something;
         self.next_token();
-        while &self.curr_token != &Token::Semicolon {
+        let expression = self.parse_expression(Precedence::Lowest)?;
+        if self.is_peek_token(Token::Semicolon) {
             self.next_token();
         }
         Ok(Statement::Return(ReturnStatement { value: expression }))
@@ -358,7 +359,7 @@ mod tests {
     #[test]
     fn test_let_parser() {
         let input = "let x = 5;
-            let y = 10;
+            let y = true;
             let foobar = 838383;";
         let program = preload(input);
 
@@ -368,15 +369,15 @@ mod tests {
         let expected = vec![
             Statement::Let(LetStatement {
                 name: String::from("x"),
-                value: Expression::Something,
+                value: Expression::Integer(5),
             }),
             Statement::Let(LetStatement {
                 name: String::from("y"),
-                value: Expression::Something,
+                value: Expression::Boolean(true),
             }),
             Statement::Let(LetStatement {
                 name: String::from("foobar"),
-                value: Expression::Something,
+                value: Expression::Integer(838383),
             }),
         ];
         for (idx, expected_statement) in expected.iter().enumerate() {
@@ -402,8 +403,8 @@ mod tests {
     #[test]
     fn test_return_parser() {
         let input = "return 10;
-            return 20;
-            return 3000;";
+            return true;
+            return add(x,y);";
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
         let program = parser.parse_program();
@@ -411,13 +412,19 @@ mod tests {
         let statements = program.unwrap().statements;
         let expected = vec![
             Statement::Return(ReturnStatement {
-                value: Expression::Something,
+                value: Expression::Integer(10),
             }),
             Statement::Return(ReturnStatement {
-                value: Expression::Something,
+                value: Expression::Boolean(true),
             }),
             Statement::Return(ReturnStatement {
-                value: Expression::Something,
+                value: Expression::Call(CallExpression {
+                    function: Box::from(Identifier("add".to_string())),
+                    arguments: vec![
+                        Box::new(Expression::Identifier("x".to_string())),
+                        Box::new(Expression::Identifier("y".to_string())),
+                    ],
+                }),
             }),
         ];
         for (idx, expected_statement) in expected.iter().enumerate() {
@@ -758,11 +765,9 @@ mod tests {
     fn test_more_fn_literal_parsing() {
         let input = "fn(x, y) { return a + b;}";
         let program = preload(input);
-        println!("{:?}", program);
         assert!(program.is_ok());
         let statements = &program.clone().unwrap().statements;
         assert!(!statements.is_empty());
-        println!("{:?}", statements);
     }
     #[test]
     fn test_call_expression_parsing() {
@@ -782,7 +787,6 @@ mod tests {
                 ],
             }),
         })];
-        println!("{:?}", program);
         assert!(program.is_ok());
         let statements = &program.clone().unwrap().statements;
         for i in 0..statements.len() {

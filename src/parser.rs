@@ -90,7 +90,7 @@ impl<'a> Parser<'a> {
         self.expect_peek(Token::Assign)?;
         self.next_token();
         value = self.parse_expression(Precedence::Lowest)?;
-        while !self.is_curr_token(Token::Semicolon) {
+        if self.is_peek_token(Token::Semicolon){
             self.next_token();
         }
         Ok(Statement::Let(LetStatement { name, value }))

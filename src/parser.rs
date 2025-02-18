@@ -1,7 +1,7 @@
 use crate::ast::{
     BlockStatement, CallExpression, Expression, ExpressionStatement, FunctionLiteral,
-    IdentifierExpression, IfExpression, InfixExpression, LetStatement, PrefixExpression, Program,
-    ReturnStatement, Statement,
+    IdentifierExpression, IfExpression, InfixExpression, LetStatement, Node, PrefixExpression,
+    Program, ReturnStatement, Statement,
 };
 use crate::lexer::Lexer;
 use crate::token::Token;
@@ -42,6 +42,13 @@ pub enum Precedence {
     Product,     // *
     Prefix,      // -X or !X
     Call,
+}
+pub fn parse(input: &str) -> Result<Node, ParseError> {
+    let l = Lexer::new(input);
+    let mut p = Parser::new(l);
+    let prog = p.parse_program()?;
+
+    Ok(Node::Program(Box::new(prog)))
 }
 
 impl<'a> Parser<'a> {
@@ -90,7 +97,7 @@ impl<'a> Parser<'a> {
         self.expect_peek(Token::Assign)?;
         self.next_token();
         value = self.parse_expression(Precedence::Lowest)?;
-        if self.is_peek_token(Token::Semicolon){
+        if self.is_peek_token(Token::Semicolon) {
             self.next_token();
         }
         Ok(Statement::Let(LetStatement { name, value }))

@@ -1,6 +1,13 @@
 use crate::ast::Statement::Let;
 use std::fmt::{Display, Formatter};
 
+// Primarily used for evaluating the AST
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum Node {
+    Program(Box<Program>),
+    Expression(Box<Expression>),
+    Statement(Box<Statement>),
+}
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Program {
     pub statements: Vec<Statement>,

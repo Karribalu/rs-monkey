@@ -4,7 +4,9 @@
 use std::io;
 mod ast;
 mod constants;
+mod evaluator;
 mod lexer;
+mod object;
 mod parser;
 mod repl;
 mod token;

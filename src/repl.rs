@@ -1,7 +1,6 @@
 use crate::lexer::Lexer;
-use crate::token::Token;
-use std::io;
 use crate::parser::Parser;
+use std::io;
 const MONKEY_ART: &str = r#"
             __,__
    .--.  .-"     "-.  .--.
@@ -31,7 +30,6 @@ pub fn start<R: io::BufRead, W: io::Write>(mut reader: R, mut writer: W) -> io::
             }
             Err(error) => {
                 println!("An error occurred {:?}\n {}", error, MONKEY_ART);
-
             }
         }
     }

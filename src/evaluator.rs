@@ -1,14 +1,14 @@
 use crate::ast::{Expression, Node, Program, Statement};
 use crate::object::Object;
 
-fn eval(program: &Node) -> Object {
+pub fn eval(program: &Node) -> Object {
     match program {
         Node::Program(program) => eval_program(*&program),
         Node::Expression(expression) => eval_expression(expression),
         Node::Statement(statement) => eval_statement(statement),
     }
 }
-fn eval_program(program: &Program) -> Object {
+pub fn eval_program(program: &Program) -> Object {
     let mut res = Object::Null;
 
     for statement in &program.statements {

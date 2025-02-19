@@ -19,6 +19,7 @@ pub fn eval_program(program: &Program) -> Object {
 fn eval_expression(expression: &Expression) -> Object {
     match expression {
         Expression::Integer(integer) => Object::Integer(*integer),
+        Expression::Boolean(boolean) => Object::Boolean(*boolean),
         _ => Object::Null,
     }
 }
@@ -37,9 +38,9 @@ mod tests {
     use crate::object::Object;
     use crate::parser::parse;
 
-    struct Test<'a> {
-        input: &'a str,
-        expected: i64,
+    struct Test<'a, I: ?Sized, E> {
+        input: &'a I,
+        expected: E,
     }
     fn test_eval(input: &str) -> Object {
         let parse_result = parse(input);
@@ -66,6 +67,23 @@ mod tests {
         for test in tests {
             let evaluated = test_eval(test.input);
             assert_eq!(evaluated, Object::Integer(test.expected))
+        }
+    }
+    #[test]
+    fn test_eval_boolean() {
+        let tests = vec![
+            Test {
+                input: "true",
+                expected: true,
+            },
+            Test {
+                input: "false",
+                expected: false,
+            },
+        ];
+        for test in tests {
+            let evaluated = test_eval(test.input);
+            assert_eq!(evaluated, Object::Boolean(test.expected))
         }
     }
 }

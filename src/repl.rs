@@ -1,7 +1,7 @@
+use crate::evaluator::eval_program;
 use crate::lexer::Lexer;
 use crate::parser::Parser;
 use std::io;
-use crate::evaluator::eval_program;
 
 const MONKEY_ART: &str = r#"
             __,__

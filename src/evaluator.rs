@@ -39,7 +39,16 @@ fn eval_expression(expression: &Expression) -> Object {
 fn eval_prefix_expression(expression: &PrefixExpression, right: Object) -> Object {
     match expression.operator.as_str() {
         "!" => eval_bang_operator(right),
+        "-" => eval_minus_prefix_operator(right),
         _ => Object::Null,
+    }
+}
+fn eval_minus_prefix_operator(object: Object) -> Object {
+    match object {
+        Object::Integer(integer) => {
+            Object::Integer(-1 * integer)
+        }
+        _ => Object::Null
     }
 }
 fn eval_bang_operator(object: Object) -> Object {
@@ -143,6 +152,31 @@ mod tests {
         for test in tests {
             let evaluated = test_eval(test.input);
             assert_eq!(evaluated, Object::Boolean(test.expected))
+        }
+    }
+    #[test]
+    fn test_eval_integer_prefix() {
+        let tests = vec![
+            Test {
+                input: "5",
+                expected: 5,
+            },
+            Test {
+                input: "-5",
+                expected: -5,
+            },
+            Test {
+                input: "-10",
+                expected: -10
+            },
+            Test {
+                input: "10",
+                expected: 10
+            }
+        ];
+        for test in tests {
+            let evaluated = test_eval(test.input);
+            assert_eq!(evaluated, Object::Integer(test.expected))
         }
     }
 }

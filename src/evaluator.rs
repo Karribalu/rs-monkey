@@ -33,6 +33,11 @@ fn eval_expression(expression: &Expression) -> Object {
             let right = eval_expression(&*prefix_expression.right);
             eval_prefix_expression(&*prefix_expression, right)
         }
+        Expression::Infix(infix) => {
+            let left_res = eval_expression(&infix.left);
+            let right_res = eval_expression(&infix.right);
+            eval_infix_expression(&infix.operator, left_res, right_res)
+        }
         _ => Object::Null,
     }
 }
@@ -45,10 +50,8 @@ fn eval_prefix_expression(expression: &PrefixExpression, right: Object) -> Objec
 }
 fn eval_minus_prefix_operator(object: Object) -> Object {
     match object {
-        Object::Integer(integer) => {
-            Object::Integer(-1 * integer)
-        }
-        _ => Object::Null
+        Object::Integer(integer) => Object::Integer(-1 * integer),
+        _ => Object::Null,
     }
 }
 fn eval_bang_operator(object: Object) -> Object {
@@ -67,6 +70,23 @@ fn eval_statement(statement: &Statement) -> Object {
         }
     }
     Object::Null
+}
+
+fn eval_infix_expression(operator: &String, left: Object, right: Object) -> Object {
+    match (left, right) {
+        (Object::Integer(l), Object::Integer(r)) => eval_integer_infix_expression(operator, l, r),
+        _ => Object::Null,
+    }
+}
+fn eval_integer_infix_expression(operator: &String, left_val: i64, right_val: i64) -> Object {
+    match operator.as_str() {
+        "+" => Object::Integer(left_val + right_val),
+        "-" => Object::Integer(left_val - right_val),
+
+        "*" => Object::Integer(left_val * right_val),
+        "/" => Object::Integer(left_val / right_val),
+        _ => Object::Null,
+    }
 }
 mod tests {
     use crate::evaluator::eval;
@@ -167,15 +187,69 @@ mod tests {
             },
             Test {
                 input: "-10",
-                expected: -10
+                expected: -10,
             },
             Test {
                 input: "10",
-                expected: 10
-            }
+                expected: 10,
+            },
         ];
         for test in tests {
             let evaluated = test_eval(test.input);
+            assert_eq!(evaluated, Object::Integer(test.expected))
+        }
+    }
+    #[test]
+    fn test_eval_integer_expression() {
+        let tests = vec![
+            Test {
+                input: "5 + 5 + 5 + 5 - 10",
+                expected: 10,
+            },
+            Test {
+                input: "2 * 2 * 2 * 2 * 2",
+                expected: 32,
+            },
+            Test {
+                input: "-50 + 100 + -50",
+                expected: 0,
+            },
+            Test {
+                input: "5 * 2 + 10",
+                expected: 20,
+            },
+            Test {
+                input: "5 + 2 * 10",
+                expected: 25,
+            },
+            Test {
+                input: "20 + 2 * -10",
+                expected: 0,
+            },
+            Test {
+                input: "50 / 2 * 2 + 10",
+                expected: 60,
+            },
+            Test {
+                input: "2 * (5 + 10)",
+                expected: 30,
+            },
+            Test {
+                input: "3 * 3 * 3 + 10",
+                expected: 37,
+            },
+            Test {
+                input: "3 * (3 * 3) + 10",
+                expected: 37,
+            },
+            Test {
+                input: "(5 + 10 * 2 + 15 / 3) * 2 + -10",
+                expected: 50,
+            },
+        ];
+        for test in tests {
+            let evaluated = test_eval(test.input);
+            println!("{:?}", test);
             assert_eq!(evaluated, Object::Integer(test.expected))
         }
     }

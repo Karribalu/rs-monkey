@@ -82,9 +82,14 @@ fn eval_integer_infix_expression(operator: &String, left_val: i64, right_val: i6
     match operator.as_str() {
         "+" => Object::Integer(left_val + right_val),
         "-" => Object::Integer(left_val - right_val),
-
         "*" => Object::Integer(left_val * right_val),
         "/" => Object::Integer(left_val / right_val),
+        "<" => Object::Boolean(left_val < right_val),
+        ">" => Object::Boolean(left_val > right_val),
+        "<=" => Object::Boolean(left_val <= right_val),
+        ">=" => Object::Boolean(left_val >= right_val),
+        "!=" => Object::Boolean(left_val != right_val),
+        "==" => Object::Boolean(left_val == right_val),
         _ => Object::Null,
     }
 }
@@ -251,6 +256,47 @@ mod tests {
             let evaluated = test_eval(test.input);
             println!("{:?}", test);
             assert_eq!(evaluated, Object::Integer(test.expected))
+        }
+    }
+    #[test]
+    fn test_eval_integer_conditional_expression() {
+        let tests = vec![
+            Test {
+                input: "1 < 2",
+                expected: true,
+            },
+            Test {
+                input: "2 <= 2",
+                expected: true,
+            },
+            Test {
+                input: "3 <= 2",
+                expected: false,
+            },
+            Test {
+                input: "2 > 3",
+                expected: false,
+            },
+            Test {
+                input: "5 > 3",
+                expected: true,
+            },
+            Test {
+                input: "5 >= 5",
+                expected: true,
+            },
+            Test {
+                input: "5 == 5",
+                expected: true,
+            },
+            Test {
+                input: "6 != 5",
+                expected: true,
+            },
+        ];
+        for test in tests {
+            let evaluated = test_eval(test.input);
+            assert_eq!(evaluated, Object::Boolean(test.expected))
         }
     }
 }

@@ -1,4 +1,5 @@
-use crate::evaluator::eval_program;
+use crate::ast::Node;
+use crate::evaluator::eval;
 use crate::lexer::Lexer;
 use crate::parser::Parser;
 use std::io;
@@ -28,7 +29,7 @@ pub fn start<R: io::BufRead, W: io::Write>(mut reader: R, mut writer: W) -> io::
         let program = parser.parse_program();
         match &program {
             Ok(result) => {
-                let evaluated = eval_program(result);
+                let evaluated = eval(&Node::Program(Box::new(result.clone())));
                 println!("Evaluated result: {}", evaluated);
                 print!("{}", result);
             }

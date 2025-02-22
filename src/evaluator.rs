@@ -1,4 +1,4 @@
-use crate::ast::{Expression, Node, PrefixExpression, Program, Statement};
+use crate::ast::{Expression, IfExpression, Node, PrefixExpression, Statement};
 use crate::object::Object;
 use thiserror::Error;
 
@@ -12,15 +12,15 @@ enum EvalError {
 }
 pub fn eval(program: &Node) -> Object {
     match program {
-        Node::Program(program) => eval_program(*&program),
+        Node::Program(program) => eval_statements(&program.statements),
         Node::Expression(expression) => eval_expression(expression),
         Node::Statement(statement) => eval_statement(statement),
     }
 }
-pub fn eval_program(program: &Program) -> Object {
+pub fn eval_statements(statements: &Vec<Statement>) -> Object {
     let mut res = Object::Null;
 
-    for statement in &program.statements {
+    for statement in statements {
         res = eval_statement(statement);
     }
     res
@@ -38,7 +38,26 @@ fn eval_expression(expression: &Expression) -> Object {
             let right_res = eval_expression(&infix.right);
             eval_infix_expression(&infix.operator, left_res, right_res)
         }
+        Expression::If(if_expression) => eval_if_expression(&*if_expression),
         _ => Object::Null,
+    }
+}
+fn eval_if_expression(if_expression: &IfExpression) -> Object {
+    // Evaluate the condition
+    let condition_res = eval_expression(&if_expression.condition);
+    if is_truthy(&condition_res) {
+        eval_statements(&if_expression.consequence.statements)
+    } else if if_expression.alternative.is_some() {
+        eval_statements(&if_expression.clone().alternative.unwrap().statements)
+    } else {
+        Object::Null
+    }
+}
+fn is_truthy(condition: &Object) -> bool {
+    match condition {
+        Object::Integer(_) => true,
+        Object::Boolean(boolean_res) => *boolean_res,
+        Object::Null => false,
     }
 }
 fn eval_prefix_expression(expression: &PrefixExpression, right: Object) -> Object {
@@ -297,6 +316,47 @@ mod tests {
         for test in tests {
             let evaluated = test_eval(test.input);
             assert_eq!(evaluated, Object::Boolean(test.expected))
+        }
+    }
+    #[test]
+    fn test_if_else_expressions() {
+        let tests = vec![
+            Test {
+                input: "if (true) {10}",
+                expected: 10,
+            },
+            Test {
+                input: "if (false) {10}",
+                expected: -1,
+            },
+            Test {
+                input: "if (1) { 10 }",
+                expected: 10,
+            },
+            Test {
+                input: "if (1 < 2) { 10 }",
+                expected: 10,
+            },
+            Test {
+                input: "if (1 < 2) { 10 }",
+                expected: 10,
+            },
+            Test {
+                input: "if (1 > 2) { 10 }",
+                expected: -1,
+            },
+            Test {
+                input: "if (2 <= 2) { 10 }",
+                expected: 10,
+            },
+        ];
+        for test in tests {
+            let evaluated = test_eval(test.input);
+            if test.expected == -1 {
+                assert_eq!(evaluated, Object::Null);
+            } else {
+                assert_eq!(evaluated, Object::Integer(test.expected));
+            }
         }
     }
 }

@@ -73,8 +73,27 @@ impl<'a> Lexer<'a> {
                 '-' => Token::Minus,
                 '/' => Token::Slash,
                 '*' => Token::Asterisk,
-                '<' => Token::Lt,
-                '>' => Token::Gt,
+                '<' => {
+                    // Handle LT and LTE
+                    self.read_char();
+                    if let Some(next_char) = self.input.peek() {
+                        if next_char == &'=' {
+                            self.read_char();
+                            return Token::LtE;
+                        }
+                    }
+                    return Token::Lt;
+                }
+                '>' => {
+                    self.read_char();
+                    if let Some(next_char) = self.input.peek() {
+                        if next_char == &'=' {
+                            self.read_char();
+                            return Token::GtE;
+                        }
+                    }
+                    return Token::Gt;
+                }
                 _ => {
                     if is_letter(&token) {
                         let ident = self.read_identifier();

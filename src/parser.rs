@@ -166,7 +166,9 @@ impl<'a> Parser<'a> {
             | Token::Eq
             | Token::NotEq
             | Token::Lt
-            | Token::Gt => Some(Parser::parse_infix_expression),
+            | Token::Gt
+            | Token::GtE
+            | Token::LtE => Some(Parser::parse_infix_expression),
             Token::LParen => Some(Parser::parse_call_expression),
             _ => None,
         }
@@ -705,7 +707,7 @@ mod tests {
     }
     #[test]
     fn test_if_else_expression() {
-        let input = "if (x < y)\
+        let input = "if (x <= y)\
         { x } else {\
             y
         }";
@@ -717,7 +719,7 @@ mod tests {
             expression: Expression::If(Box::new(IfExpression {
                 condition: Expression::Infix(Box::new(InfixExpression {
                     left: Box::from(Identifier("x".to_string())),
-                    operator: "<".to_string(),
+                    operator: "<=".to_string(),
                     right: Box::from(Identifier("y".to_string())),
                 })),
                 consequence: BlockStatement {

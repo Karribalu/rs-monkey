@@ -22,6 +22,8 @@ pub enum Token {
 
     Lt,
     Gt,
+    LtE,
+    GtE,
 
     // Delimiters
     Comma,
@@ -58,7 +60,7 @@ impl Token {
     pub fn precedence(&self) -> Precedence {
         match self {
             Token::Eq | Token::NotEq => Precedence::Equals,
-            Token::Lt | Token::Gt => Precedence::LessGreater,
+            Token::Lt | Token::Gt | Token::LtE | Token::GtE => Precedence::LessGreater,
             Token::Plus | Token::Minus => Precedence::Sum,
             Token::Slash | Token::Asterisk => Precedence::Product,
             Token::LParen => Precedence::Call,
@@ -81,6 +83,8 @@ impl Display for Token {
             Token::Slash => "/",
             Token::Eq => "==",
             Token::NotEq => "!=",
+            Token::LtE => "<=",
+            Token::GtE => ">=",
             Token::Lt => "<",
             Token::Gt => ">",
             Token::Comma => ",",

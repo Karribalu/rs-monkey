@@ -1,4 +1,4 @@
-use crate::ast::{Expression, IfExpression, Node, PrefixExpression, Statement};
+use crate::ast::{Expression, IfExpression, Node, PrefixExpression, ReturnStatement, Statement};
 use crate::object::Object;
 use thiserror::Error;
 
@@ -21,6 +21,14 @@ pub fn eval_statements(statements: &Vec<Statement>) -> Object {
     let mut res = Object::Null;
 
     for statement in statements {
+        match statement {
+            Statement::Let(_) => {}
+            Statement::Return(_) => {
+                // Return the value if one of the statements is a return statement
+                return eval_statement(statement);
+            }
+            Statement::Expression(_) => {}
+        }
         res = eval_statement(statement);
     }
     res
@@ -58,6 +66,7 @@ fn is_truthy(condition: &Object) -> bool {
         Object::Integer(_) => true,
         Object::Boolean(boolean_res) => *boolean_res,
         Object::Null => false,
+        Object::Return(return_object) => is_truthy(return_object),
     }
 }
 fn eval_prefix_expression(expression: &PrefixExpression, right: Object) -> Object {
@@ -78,17 +87,23 @@ fn eval_bang_operator(object: Object) -> Object {
         Object::Integer(_) => Object::Boolean(false),
         Object::Boolean(boolean) => Object::Boolean(!boolean),
         Object::Null => Object::Boolean(true),
+        Object::Return(return_object) => eval_bang_operator(*return_object),
     }
 }
 fn eval_statement(statement: &Statement) -> Object {
     match statement {
         Statement::Let(_) => {}
-        Statement::Return(_) => {}
+        Statement::Return(return_statement) => {
+            return eval_return_statement(return_statement);
+        }
         Statement::Expression(expression) => {
             return eval_expression(&expression.expression);
         }
     }
     Object::Null
+}
+fn eval_return_statement(return_statement: &ReturnStatement) -> Object {
+    eval_expression(&return_statement.value)
 }
 
 fn eval_infix_expression(operator: &String, left: Object, right: Object) -> Object {
@@ -357,6 +372,28 @@ mod tests {
             } else {
                 assert_eq!(evaluated, Object::Integer(test.expected));
             }
+        }
+    }
+    #[test]
+    fn test_return_statements() {
+        let tests = vec![
+            Test {
+                input: "return 10;",
+                expected: 10,
+            },
+            Test {
+                input: "return 2 * 5; 9;",
+                expected: 10,
+            },
+            Test {
+                input: "9; return 2 * 20; 9;",
+                expected: 40,
+            }
+        ];
+        for test in tests {
+            let evaluated = test_eval(test.input);
+            println!("{:?}", evaluated);
+            assert_eq!(evaluated, Object::Integer(test.expected))
         }
     }
 }

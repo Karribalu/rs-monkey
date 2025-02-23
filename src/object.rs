@@ -3,6 +3,7 @@ use std::fmt::{Display, Formatter};
 pub enum Object {
     Integer(i64),
     Boolean(bool),
+    Return(Box<Object>),
     Null,
 }
 impl Display for Object {
@@ -17,6 +18,7 @@ impl Display for Object {
             Object::Null => {
                 write!(f, "null")
             }
+            Object::Return(return_statement) => write!(f, "{}", return_statement),
         }
     }
 }
@@ -27,6 +29,7 @@ impl Object {
             Object::Integer(_) => "INTEGER".to_string(),
             Object::Boolean(_) => "BOOLEAN".to_string(),
             Object::Null => "NULL".to_string(),
+            Object::Return(_) => "RETURN".to_string(),
         }
     }
 }

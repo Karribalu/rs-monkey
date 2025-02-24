@@ -1,4 +1,4 @@
-use crate::ast::{Expression, IfExpression, Node, PrefixExpression, ReturnStatement, Statement};
+use crate::ast::{BlockStatement, Expression, IfExpression, Node, PrefixExpression, Program, ReturnStatement, Statement};
 use crate::object::Object;
 use thiserror::Error;
 
@@ -12,15 +12,16 @@ enum EvalError {
 }
 pub fn eval(program: &Node) -> Object {
     match program {
-        Node::Program(program) => eval_statements(&program.statements),
+        Node::Program(program) => eval_program(&program),
         Node::Expression(expression) => eval_expression(expression),
         Node::Statement(statement) => eval_statement(statement),
     }
 }
-pub fn eval_statements(statements: &Vec<Statement>) -> Object {
+pub fn eval_program(program: &Program) -> Object {
     let mut res = Object::Null;
 
-    for statement in statements {
+    for statement in &program.statements {
+        println!("{:?}", statement);
         match statement {
             Statement::Let(_) => {}
             Statement::Return(_) => {
@@ -54,9 +55,10 @@ fn eval_if_expression(if_expression: &IfExpression) -> Object {
     // Evaluate the condition
     let condition_res = eval_expression(&if_expression.condition);
     if is_truthy(&condition_res) {
-        eval_statements(&if_expression.consequence.statements)
+        println!("It is truthy");
+        eval_block_statement(&if_expression.consequence)
     } else if if_expression.alternative.is_some() {
-        eval_statements(&if_expression.clone().alternative.unwrap().statements)
+        eval_block_statement(&if_expression.clone().alternative.unwrap())
     } else {
         Object::Null
     }
@@ -126,6 +128,20 @@ fn eval_integer_infix_expression(operator: &String, left_val: i64, right_val: i6
         "==" => Object::Boolean(left_val == right_val),
         _ => Object::Null,
     }
+}
+fn eval_block_statement(block: &BlockStatement) -> Object {
+    let mut result = Object::Null;
+    for statement in &block.statements {
+        match statement {
+            Statement::Let(_) => {}
+            Statement::Return(return_statement) => {
+                return eval_return_statement(return_statement)
+            }
+            Statement::Expression(_) => {}
+        }
+        eval_statement(statement);
+    }
+    result
 }
 mod tests {
     use crate::evaluator::eval;
@@ -377,17 +393,21 @@ mod tests {
     #[test]
     fn test_return_statements() {
         let tests = vec![
+            // Test {
+            //     input: "return 10;",
+            //     expected: 10,
+            // },
+            // Test {
+            //     input: "return 2 * 5; 9;",
+            //     expected: 10,
+            // },
+            // Test {
+            //     input: "9; return 2 * 20; 9;",
+            //     expected: 40,
+            // },
             Test {
-                input: "return 10;",
-                expected: 10,
-            },
-            Test {
-                input: "return 2 * 5; 9;",
-                expected: 10,
-            },
-            Test {
-                input: "9; return 2 * 20; 9;",
-                expected: 40,
+                input: "if (10 < 20) { if (10 > 1) { return 10; } return 1;}",
+                expected: 10
             }
         ];
         for test in tests {

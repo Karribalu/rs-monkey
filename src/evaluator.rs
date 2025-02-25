@@ -25,18 +25,14 @@ pub fn eval_program(program: &Program) -> Object {
             Statement::Let(_) => {}
             Statement::Return(_) => {
                 // Return the value if one of the statements is a return statement
-                return eval_statement(statement);
+                let Object::Return(object) = eval_statement(statement) else { todo!() };
+                return *object;
             }
-            Statement::Expression(expression) => {
-                let res = eval_expression(&expression.expression);
-                if res.get_type() == "RETURN" {
-                    return res;
-                }
-            }
+            Statement::Expression(_) => {}
         }
         res = eval_statement(statement);
-        if res.get_type() == "RETURN" {
-            return res;
+        if let Object::Return(return_statement) = res {
+            return *return_statement;
         }
     }
     res
@@ -414,7 +410,7 @@ mod tests {
         ];
         for test in tests {
             let evaluated = test_eval(test.input);
-            assert_eq!(evaluated, Object::Return(Box::new(Object::Integer(test.expected))));
+            assert_eq!(evaluated, Object::Integer(test.expected));
         }
     }
 }

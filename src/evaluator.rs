@@ -21,16 +21,23 @@ pub fn eval_program(program: &Program) -> Object {
     let mut res = Object::Null;
 
     for statement in &program.statements {
-        println!("{:?}", statement);
         match statement {
             Statement::Let(_) => {}
             Statement::Return(_) => {
                 // Return the value if one of the statements is a return statement
                 return eval_statement(statement);
             }
-            Statement::Expression(_) => {}
+            Statement::Expression(expression) => {
+                let res = eval_expression(&expression.expression);
+                if res.get_type() == "RETURN" {
+                    return res;
+                }
+            }
         }
         res = eval_statement(statement);
+        if res.get_type() == "RETURN" {
+            return res;
+        }
     }
     res
 }
@@ -55,7 +62,6 @@ fn eval_if_expression(if_expression: &IfExpression) -> Object {
     // Evaluate the condition
     let condition_res = eval_expression(&if_expression.condition);
     if is_truthy(&condition_res) {
-        println!("It is truthy");
         eval_block_statement(&if_expression.consequence)
     } else if if_expression.alternative.is_some() {
         eval_block_statement(&if_expression.clone().alternative.unwrap())
@@ -105,7 +111,7 @@ fn eval_statement(statement: &Statement) -> Object {
     Object::Null
 }
 fn eval_return_statement(return_statement: &ReturnStatement) -> Object {
-    eval_expression(&return_statement.value)
+    Object::Return(Box::new(eval_expression(&return_statement.value)))
 }
 
 fn eval_infix_expression(operator: &String, left: Object, right: Object) -> Object {
@@ -132,14 +138,10 @@ fn eval_integer_infix_expression(operator: &String, left_val: i64, right_val: i6
 fn eval_block_statement(block: &BlockStatement) -> Object {
     let mut result = Object::Null;
     for statement in &block.statements {
-        match statement {
-            Statement::Let(_) => {}
-            Statement::Return(return_statement) => {
-                return eval_return_statement(return_statement)
-            }
-            Statement::Expression(_) => {}
+        result = eval_statement(statement);
+        if result.get_type() == "RETURN" {
+            return result;
         }
-        eval_statement(statement);
     }
     result
 }
@@ -304,7 +306,6 @@ mod tests {
         ];
         for test in tests {
             let evaluated = test_eval(test.input);
-            println!("{:?}", test);
             assert_eq!(evaluated, Object::Integer(test.expected))
         }
     }
@@ -383,6 +384,7 @@ mod tests {
         ];
         for test in tests {
             let evaluated = test_eval(test.input);
+            println!("{:?}", evaluated);
             if test.expected == -1 {
                 assert_eq!(evaluated, Object::Null);
             } else {
@@ -393,27 +395,26 @@ mod tests {
     #[test]
     fn test_return_statements() {
         let tests = vec![
-            // Test {
-            //     input: "return 10;",
-            //     expected: 10,
-            // },
-            // Test {
-            //     input: "return 2 * 5; 9;",
-            //     expected: 10,
-            // },
-            // Test {
-            //     input: "9; return 2 * 20; 9;",
-            //     expected: 40,
-            // },
             Test {
-                input: "if (10 < 20) { if (10 > 1) { return 10; } return 1;}",
-                expected: 10
-            }
+                input: "return 10;",
+                expected: 10,
+            },
+            Test {
+                input: "return 2 * 5; 9;",
+                expected: 10,
+            },
+            Test {
+                input: "9; return 2 * 20; 9;",
+                expected: 40,
+            },
+            Test {
+            input: "if (10 < 20) { if (10 > 1) { return 10; } return 1;}",
+            expected: 10
+        }
         ];
         for test in tests {
             let evaluated = test_eval(test.input);
-            println!("{:?}", evaluated);
-            assert_eq!(evaluated, Object::Integer(test.expected))
+            assert_eq!(evaluated, Object::Return(Box::new(Object::Integer(test.expected))));
         }
     }
 }

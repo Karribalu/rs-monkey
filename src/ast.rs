@@ -70,7 +70,6 @@ pub enum Expression {
     If(Box<IfExpression>),
     Function(FunctionLiteral),
     Call(CallExpression),
-    Something,
 }
 impl Display for Expression {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
@@ -91,9 +90,6 @@ impl Display for Expression {
                 write!(f, "{}", boolean.to_string())
             }
             Expression::If(if_expression) => write!(f, "if {}", if_expression),
-            Expression::Something => {
-                write!(f, "something")
-            }
             Expression::Function(function) => {
                 write!(f, "fn {}", function)
             }

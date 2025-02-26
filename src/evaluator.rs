@@ -1,23 +1,26 @@
-use crate::ast::{BlockStatement, Expression, IfExpression, Node, PrefixExpression, Program, ReturnStatement, Statement};
+use crate::ast::{
+    BlockStatement, Expression, IfExpression, Node, PrefixExpression, Program, ReturnStatement,
+    Statement,
+};
 use crate::object::Object;
 use thiserror::Error;
 
-type EvalResult<T> = Result<T, EvalError>;
-#[derive(Error, Debug)]
-enum EvalError {
-    #[error("Error occurred while evaluating prefix {0}")]
-    PrefixEvalFailed(String),
-    #[error("Error occurred while evaluating bang {0}")]
-    BangEvalFailed(String),
+pub type EvalResult<T> = Result<T, EvalError>;
+#[derive(Error, Debug, Eq, PartialEq)]
+pub enum EvalError {
+    #[error("type mismatch: {0}")]
+    TypeMismatch(String),
+    #[error("unknown operator: {0}")]
+    UnknownOperator(String),
 }
-pub fn eval(program: &Node) -> Object {
+pub fn eval(program: &Node) -> EvalResult<Object> {
     match program {
         Node::Program(program) => eval_program(&program),
         Node::Expression(expression) => eval_expression(expression),
         Node::Statement(statement) => eval_statement(statement),
     }
 }
-pub fn eval_program(program: &Program) -> Object {
+pub fn eval_program(program: &Program) -> EvalResult<Object> {
     let mut res = Object::Null;
 
     for statement in &program.statements {
@@ -25,44 +28,46 @@ pub fn eval_program(program: &Program) -> Object {
             Statement::Let(_) => {}
             Statement::Return(_) => {
                 // Return the value if one of the statements is a return statement
-                let Object::Return(object) = eval_statement(statement) else { todo!() };
-                return *object;
+                let Object::Return(object) = eval_statement(statement)? else {
+                    todo!()
+                };
+                return Ok(*object);
             }
             Statement::Expression(_) => {}
         }
-        res = eval_statement(statement);
+        res = eval_statement(statement)?;
         if let Object::Return(return_statement) = res {
-            return *return_statement;
+            return Ok(*return_statement);
         }
     }
-    res
+    Ok(res)
 }
-fn eval_expression(expression: &Expression) -> Object {
+fn eval_expression(expression: &Expression) -> EvalResult<Object> {
     match expression {
-        Expression::Integer(integer) => Object::Integer(*integer),
-        Expression::Boolean(boolean) => Object::Boolean(*boolean),
+        Expression::Integer(integer) => Ok(Object::Integer(*integer)),
+        Expression::Boolean(boolean) => Ok(Object::Boolean(*boolean)),
         Expression::Prefix(prefix_expression) => {
-            let right = eval_expression(&*prefix_expression.right);
+            let right = eval_expression(&*prefix_expression.right)?;
             eval_prefix_expression(&*prefix_expression, right)
         }
         Expression::Infix(infix) => {
-            let left_res = eval_expression(&infix.left);
-            let right_res = eval_expression(&infix.right);
+            let left_res = eval_expression(&infix.left)?;
+            let right_res = eval_expression(&infix.right)?;
             eval_infix_expression(&infix.operator, left_res, right_res)
         }
         Expression::If(if_expression) => eval_if_expression(&*if_expression),
-        _ => Object::Null,
+        _ => Ok(Object::Null),
     }
 }
-fn eval_if_expression(if_expression: &IfExpression) -> Object {
+fn eval_if_expression(if_expression: &IfExpression) -> EvalResult<Object> {
     // Evaluate the condition
-    let condition_res = eval_expression(&if_expression.condition);
+    let condition_res = eval_expression(&if_expression.condition)?;
     if is_truthy(&condition_res) {
         eval_block_statement(&if_expression.consequence)
     } else if if_expression.alternative.is_some() {
         eval_block_statement(&if_expression.clone().alternative.unwrap())
     } else {
-        Object::Null
+        Ok(Object::Null)
     }
 }
 fn is_truthy(condition: &Object) -> bool {
@@ -73,17 +78,24 @@ fn is_truthy(condition: &Object) -> bool {
         Object::Return(return_object) => is_truthy(return_object),
     }
 }
-fn eval_prefix_expression(expression: &PrefixExpression, right: Object) -> Object {
+fn eval_prefix_expression(expression: &PrefixExpression, right: Object) -> EvalResult<Object> {
     match expression.operator.as_str() {
-        "!" => eval_bang_operator(right),
+        "!" => Ok(eval_bang_operator(right)),
         "-" => eval_minus_prefix_operator(right),
-        _ => Object::Null,
+        _ => Err(EvalError::UnknownOperator(format!(
+            "{}{}",
+            expression.operator,
+            right.get_type()
+        ))),
     }
 }
-fn eval_minus_prefix_operator(object: Object) -> Object {
+fn eval_minus_prefix_operator(object: Object) -> EvalResult<Object> {
     match object {
-        Object::Integer(integer) => Object::Integer(-1 * integer),
-        _ => Object::Null,
+        Object::Integer(integer) => Ok(Object::Integer(-1 * integer)),
+        _ => Err(EvalError::UnknownOperator(format!(
+            "-{}",
+            object.get_type()
+        ))),
     }
 }
 fn eval_bang_operator(object: Object) -> Object {
@@ -94,55 +106,77 @@ fn eval_bang_operator(object: Object) -> Object {
         Object::Return(return_object) => eval_bang_operator(*return_object),
     }
 }
-fn eval_statement(statement: &Statement) -> Object {
+fn eval_statement(statement: &Statement) -> EvalResult<Object> {
     match statement {
         Statement::Let(_) => {}
         Statement::Return(return_statement) => {
-            return eval_return_statement(return_statement);
+            return Ok(eval_return_statement(return_statement)?);
         }
         Statement::Expression(expression) => {
-            return eval_expression(&expression.expression);
+            return Ok(eval_expression(&expression.expression)?);
         }
     }
-    Object::Null
+    Ok(Object::Null)
 }
-fn eval_return_statement(return_statement: &ReturnStatement) -> Object {
-    Object::Return(Box::new(eval_expression(&return_statement.value)))
+fn eval_return_statement(return_statement: &ReturnStatement) -> EvalResult<Object> {
+    Ok(Object::Return(Box::new(eval_expression(
+        &return_statement.value,
+    )?)))
 }
 
-fn eval_infix_expression(operator: &String, left: Object, right: Object) -> Object {
-    match (left, right) {
+fn eval_infix_expression(operator: &String, left: Object, right: Object) -> EvalResult<Object> {
+    if left.get_type() != right.get_type() {
+        Err(EvalError::TypeMismatch(format!(
+            "{} {} {}",
+            left.get_type(),
+            operator,
+            right.get_type()
+        )))?
+    }
+    match (&left, &right) {
         (Object::Integer(l), Object::Integer(r)) => eval_integer_infix_expression(operator, l, r),
-        _ => Object::Null,
+        _ => Err(EvalError::UnknownOperator(format!(
+            "{} {} {}",
+            left.get_type(),
+            operator,
+            right.get_type()
+        ))),
     }
 }
-fn eval_integer_infix_expression(operator: &String, left_val: i64, right_val: i64) -> Object {
+fn eval_integer_infix_expression(
+    operator: &String,
+    left_val: &i64,
+    right_val: &i64,
+) -> EvalResult<Object> {
     match operator.as_str() {
-        "+" => Object::Integer(left_val + right_val),
-        "-" => Object::Integer(left_val - right_val),
-        "*" => Object::Integer(left_val * right_val),
-        "/" => Object::Integer(left_val / right_val),
-        "<" => Object::Boolean(left_val < right_val),
-        ">" => Object::Boolean(left_val > right_val),
-        "<=" => Object::Boolean(left_val <= right_val),
-        ">=" => Object::Boolean(left_val >= right_val),
-        "!=" => Object::Boolean(left_val != right_val),
-        "==" => Object::Boolean(left_val == right_val),
-        _ => Object::Null,
+        "+" => Ok(Object::Integer(left_val + right_val)),
+        "-" => Ok(Object::Integer(left_val - right_val)),
+        "*" => Ok(Object::Integer(left_val * right_val)),
+        "/" => Ok(Object::Integer(left_val / right_val)),
+        "<" => Ok(Object::Boolean(left_val < right_val)),
+        ">" => Ok(Object::Boolean(left_val > right_val)),
+        "<=" => Ok(Object::Boolean(left_val <= right_val)),
+        ">=" => Ok(Object::Boolean(left_val >= right_val)),
+        "!=" => Ok(Object::Boolean(left_val != right_val)),
+        "==" => Ok(Object::Boolean(left_val == right_val)),
+        _ => Err(EvalError::UnknownOperator(format!(
+            "{} {} {}",
+            left_val, operator, right_val
+        ))),
     }
 }
-fn eval_block_statement(block: &BlockStatement) -> Object {
+fn eval_block_statement(block: &BlockStatement) -> EvalResult<Object> {
     let mut result = Object::Null;
     for statement in &block.statements {
-        result = eval_statement(statement);
+        result = eval_statement(statement)?;
         if result.get_type() == "RETURN" {
-            return result;
+            return Ok(result);
         }
     }
-    result
+    Ok(result)
 }
 mod tests {
-    use crate::evaluator::eval;
+    use crate::evaluator::{eval, EvalResult};
     use crate::object::Object;
     use crate::parser::parse;
     #[derive(Debug)]
@@ -150,13 +184,13 @@ mod tests {
         input: &'a I,
         expected: E,
     }
-    fn test_eval(input: &str) -> Object {
+    fn test_eval(input: &str) -> EvalResult<Object> {
         let parse_result = parse(input);
         match parse_result {
             Ok(node) => eval(&node),
-            Err(error) => {
+            Err(_) => {
                 println!("Program parsing failed");
-                Object::Null
+                Ok(Object::Null)
             }
         }
     }
@@ -173,7 +207,7 @@ mod tests {
             },
         ];
         for test in tests {
-            let evaluated = test_eval(test.input);
+            let evaluated = test_eval(test.input).unwrap();
             assert_eq!(evaluated, Object::Integer(test.expected))
         }
     }
@@ -190,7 +224,7 @@ mod tests {
             },
         ];
         for test in tests {
-            let evaluated = test_eval(test.input);
+            let evaluated = test_eval(test.input).unwrap();
             assert_eq!(evaluated, Object::Boolean(test.expected))
         }
     }
@@ -223,7 +257,7 @@ mod tests {
             },
         ];
         for test in tests {
-            let evaluated = test_eval(test.input);
+            let evaluated = test_eval(test.input).unwrap();
             assert_eq!(evaluated, Object::Boolean(test.expected))
         }
     }
@@ -248,7 +282,7 @@ mod tests {
             },
         ];
         for test in tests {
-            let evaluated = test_eval(test.input);
+            let evaluated = test_eval(test.input).unwrap();
             assert_eq!(evaluated, Object::Integer(test.expected))
         }
     }
@@ -301,7 +335,7 @@ mod tests {
             },
         ];
         for test in tests {
-            let evaluated = test_eval(test.input);
+            let evaluated = test_eval(test.input).unwrap();
             assert_eq!(evaluated, Object::Integer(test.expected))
         }
     }
@@ -342,7 +376,7 @@ mod tests {
             },
         ];
         for test in tests {
-            let evaluated = test_eval(test.input);
+            let evaluated = test_eval(test.input).unwrap();
             assert_eq!(evaluated, Object::Boolean(test.expected))
         }
     }
@@ -379,7 +413,7 @@ mod tests {
             },
         ];
         for test in tests {
-            let evaluated = test_eval(test.input);
+            let evaluated = test_eval(test.input).unwrap();
             println!("{:?}", evaluated);
             if test.expected == -1 {
                 assert_eq!(evaluated, Object::Null);
@@ -404,13 +438,56 @@ mod tests {
                 expected: 40,
             },
             Test {
-            input: "if (10 < 20) { if (10 > 1) { return 10; } return 1;}",
-            expected: 10
+                input: "if (10 < 20) { if (10 > 1) { return 10; } return 1;}",
+                expected: 10,
+            },
+        ];
+        for test in tests {
+            let evaluated = test_eval(test.input).unwrap();
+            assert_eq!(evaluated, Object::Integer(test.expected));
         }
+    }
+    #[test]
+    fn test_error_handling() {
+        let tests = vec![
+            Test {
+                input: "5 + true;",
+                expected: "type mismatch: INTEGER + BOOLEAN",
+            },
+            Test {
+                input: "5 + true; 5;",
+                expected: "type mismatch: INTEGER + BOOLEAN",
+            },
+            Test {
+                input: "-true",
+                expected: "unknown operator: -BOOLEAN",
+            },
+            Test {
+                input: "true + false;",
+                expected: "unknown operator: BOOLEAN + BOOLEAN",
+            },
+            Test {
+                input: "5; true + false; 5",
+                expected: "unknown operator: BOOLEAN + BOOLEAN",
+            },
+            Test {
+                input: "if (10 > 1) { true + false; }",
+                expected: "unknown operator: BOOLEAN + BOOLEAN",
+            },
+            Test {
+                input: "if (10 > 1) {
+                if (10 > 1) {
+                    return true + false;
+                }
+                    return 1;
+                }",
+                expected: "unknown operator: BOOLEAN + BOOLEAN",
+            },
         ];
         for test in tests {
             let evaluated = test_eval(test.input);
-            assert_eq!(evaluated, Object::Integer(test.expected));
+            assert!(evaluated.is_err());
+            assert_eq!(evaluated.err().unwrap().to_string().as_str(), test.expected);
         }
     }
 }

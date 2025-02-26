@@ -30,7 +30,7 @@ pub fn start<R: io::BufRead, W: io::Write>(mut reader: R, mut writer: W) -> io::
         match &program {
             Ok(result) => {
                 let evaluated = eval(&Node::Program(Box::new(result.clone())));
-                println!("Evaluated result: {}", evaluated);
+                println!("Evaluated result: {:?}", evaluated);
                 print!("{}", result);
             }
             Err(error) => {

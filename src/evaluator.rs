@@ -1,9 +1,6 @@
-use crate::ast::{
-    BlockStatement, Expression, IfExpression, Node, PrefixExpression, Program, ReturnStatement,
-    Statement,
-};
-use crate::object::Object;
+use crate::ast::{BlockStatement, Expression, IfExpression, LetStatement, Node, PrefixExpression, Program, ReturnStatement, Statement};
 use thiserror::Error;
+use crate::object::Object;
 
 pub type EvalResult<T> = Result<T, EvalError>;
 #[derive(Error, Debug, Eq, PartialEq)]
@@ -12,6 +9,8 @@ pub enum EvalError {
     TypeMismatch(String),
     #[error("unknown operator: {0}")]
     UnknownOperator(String),
+    #[error("identifier not found: {0}")]
+    IdentifierNotFound(String),
 }
 pub fn eval(program: &Node) -> EvalResult<Object> {
     match program {
@@ -25,7 +24,9 @@ pub fn eval_program(program: &Program) -> EvalResult<Object> {
 
     for statement in &program.statements {
         match statement {
-            Statement::Let(_) => {}
+            Statement::Let(let_statement) => {
+                let _ = eval_let_statement(&let_statement);
+            }
             Statement::Return(_) => {
                 // Return the value if one of the statements is a return statement
                 let Object::Return(object) = eval_statement(statement)? else {
@@ -41,6 +42,9 @@ pub fn eval_program(program: &Program) -> EvalResult<Object> {
         }
     }
     Ok(res)
+}
+fn eval_let_statement(statement: &LetStatement) -> EvalResult<Object> {
+    Ok(Object::Null)
 }
 fn eval_expression(expression: &Expression) -> EvalResult<Object> {
     match expression {
@@ -483,11 +487,40 @@ mod tests {
                 }",
                 expected: "unknown operator: BOOLEAN + BOOLEAN",
             },
+            Test {
+                input: "foobar",
+                expected: "identifier not found: foobar",
+            },
         ];
         for test in tests {
             let evaluated = test_eval(test.input);
             assert!(evaluated.is_err());
             assert_eq!(evaluated.err().unwrap().to_string().as_str(), test.expected);
+        }
+    }
+    #[test]
+    fn test_let_statement() {
+        let tests = vec![
+            Test {
+                input: "let a = 5; a;",
+                expected: 5,
+            },
+            Test {
+                input: "let a = 5 * 5; a;",
+                expected: 25,
+            },
+            Test {
+                input: "let a = 5; let b = a; b;",
+                expected: 5,
+            },
+            Test {
+                input: "let a = 5; let b = a; let c = a + b + 5; c;",
+                expected: 15,
+            },
+        ];
+        for test in tests {
+            let evaluated = test_eval(test.input).unwrap();
+            assert_eq!(evaluated, Object::Integer(test.expected));
         }
     }
 }

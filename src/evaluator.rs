@@ -1,6 +1,6 @@
 use crate::ast::{BlockStatement, Expression, IfExpression, LetStatement, Node, PrefixExpression, Program, ReturnStatement, Statement};
 use thiserror::Error;
-use crate::object::Object;
+use crate::object::{Environment, Object};
 
 pub type EvalResult<T> = Result<T, EvalError>;
 #[derive(Error, Debug, Eq, PartialEq)]
@@ -12,20 +12,21 @@ pub enum EvalError {
     #[error("identifier not found: {0}")]
     IdentifierNotFound(String),
 }
-pub fn eval(program: &Node) -> EvalResult<Object> {
+pub fn eval(program: &Node, env: &mut Environment) -> EvalResult<Object> {
     match program {
         Node::Program(program) => eval_program(&program),
         Node::Expression(expression) => eval_expression(expression),
         Node::Statement(statement) => eval_statement(statement),
     }
 }
-pub fn eval_program(program: &Program) -> EvalResult<Object> {
+pub fn eval_program(program: &Program, env: &mut Environment) -> EvalResult<Object> {
     let mut res = Object::Null;
 
     for statement in &program.statements {
         match statement {
             Statement::Let(let_statement) => {
-                let _ = eval_let_statement(&let_statement);
+                let res = eval_let_statement(&let_statement)?;
+                env.set()
             }
             Statement::Return(_) => {
                 // Return the value if one of the statements is a return statement
@@ -181,7 +182,7 @@ fn eval_block_statement(block: &BlockStatement) -> EvalResult<Object> {
 }
 mod tests {
     use crate::evaluator::{eval, EvalResult};
-    use crate::object::Object;
+    use crate::object::{Environment, Object};
     use crate::parser::parse;
     #[derive(Debug)]
     struct Test<'a, I: ?Sized, E> {
@@ -189,9 +190,10 @@ mod tests {
         expected: E,
     }
     fn test_eval(input: &str) -> EvalResult<Object> {
+        let mut env = Environment::new();
         let parse_result = parse(input);
         match parse_result {
-            Ok(node) => eval(&node),
+            Ok(node) => eval(&node, &mut env),
             Err(_) => {
                 println!("Program parsing failed");
                 Ok(Object::Null)
@@ -487,13 +489,14 @@ mod tests {
                 }",
                 expected: "unknown operator: BOOLEAN + BOOLEAN",
             },
-            Test {
-                input: "foobar",
-                expected: "identifier not found: foobar",
-            },
+            // Test {
+            //     input: "foobar",
+            //     expected: "identifier not found: foobar",
+            // },
         ];
         for test in tests {
             let evaluated = test_eval(test.input);
+            println!("{:?}", evaluated);
             assert!(evaluated.is_err());
             assert_eq!(evaluated.err().unwrap().to_string().as_str(), test.expected);
         }

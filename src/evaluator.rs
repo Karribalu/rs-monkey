@@ -14,7 +14,7 @@ pub enum EvalError {
 }
 pub fn eval(program: &Node, env: &mut Environment) -> EvalResult<Object> {
     match program {
-        Node::Program(program) => eval_program(&program),
+        Node::Program(program) => eval_program(&program, env),
         Node::Expression(expression) => eval_expression(expression),
         Node::Statement(statement) => eval_statement(statement),
     }
@@ -26,7 +26,8 @@ pub fn eval_program(program: &Program, env: &mut Environment) -> EvalResult<Obje
         match statement {
             Statement::Let(let_statement) => {
                 let res = eval_let_statement(&let_statement)?;
-                env.set()
+                // env.set()
+                Object::Null
             }
             Statement::Return(_) => {
                 // Return the value if one of the statements is a return statement
@@ -35,7 +36,9 @@ pub fn eval_program(program: &Program, env: &mut Environment) -> EvalResult<Obje
                 };
                 return Ok(*object);
             }
-            Statement::Expression(_) => {}
+            Statement::Expression(_) => {
+                Object::Null
+            }
         }
         res = eval_statement(statement)?;
         if let Object::Return(return_statement) = res {
